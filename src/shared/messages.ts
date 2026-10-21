@@ -25,12 +25,14 @@ export type FromWebview =
   | { type: 'renameBranch'; ref: string }
   | { type: 'deleteBranch'; ref: string }
   | { type: 'createTaskBranch' }
+  | { type: 'moveDirtyToTaskBranch' }
   | { type: 'verifyBranchForTask' }
   | { type: 'setupAgentRules' }
   | { type: 'createWorktree'; ref?: string }
   | { type: 'openWorktree'; path: string }
   | { type: 'removeWorktree'; path: string }
-  | { type: 'selectRepo'; root: string };
+  | { type: 'selectRepo'; root: string }
+  | { type: 'openRepoInWindow'; root: string };
 
 export function isFromWebview(value: unknown): value is FromWebview {
   if (typeof value !== 'object' || value === null) return false;
@@ -39,6 +41,7 @@ export function isFromWebview(value: unknown): value is FromWebview {
     case 'ready':
     case 'refresh':
     case 'createTaskBranch':
+    case 'moveDirtyToTaskBranch':
     case 'verifyBranchForTask':
     case 'setupAgentRules':
       return true;
@@ -55,6 +58,7 @@ export function isFromWebview(value: unknown): value is FromWebview {
     case 'removeWorktree':
       return typeof message.path === 'string' && message.path.length > 0;
     case 'selectRepo':
+    case 'openRepoInWindow':
       return typeof message.root === 'string' && message.root.length > 0;
     default:
       return false;

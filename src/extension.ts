@@ -7,6 +7,8 @@ import {
   CREATE_WORKTREE_COMMAND,
   DELETE_BRANCH_COMMAND,
   DIAGNOSE_ENV_COMMAND,
+  MOVE_DIRTY_TO_TASK_COMMAND,
+  OPEN_REPO_WINDOW_COMMAND,
   OPEN_WORKTREE_COMMAND,
   REMOVE_WORKTREE_COMMAND,
   RENAME_BRANCH_COMMAND,
@@ -15,6 +17,7 @@ import {
   VERIFY_TASK_BRANCH_COMMAND,
 } from './branchActions';
 import { RepoService } from './repoService';
+import { AutoGuardWatcher } from './ui/autoGuardWatcher';
 import { BranchPanelProvider } from './ui/branchPanel/provider';
 import { BranchStatusBar, FOCUS_PANEL_COMMAND } from './ui/statusBar';
 
@@ -22,11 +25,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const repos = new RepoService();
   const actions = new BranchActions(repos);
   const statusBar = new BranchStatusBar(repos);
+  const autoGuard = new AutoGuardWatcher(repos, actions);
   const panel = new BranchPanelProvider(context.extensionUri, repos, actions);
 
   context.subscriptions.push(
     repos,
     statusBar,
+    autoGuard,
     panel,
     vscode.window.registerWebviewViewProvider(BranchPanelProvider.viewType, panel),
     vscode.commands.registerCommand('branchpilot.refresh', () => repos.refresh()),
@@ -38,6 +43,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand(RENAME_BRANCH_COMMAND, (ref?: string) => actions.renameBranch(ref)),
     vscode.commands.registerCommand(DELETE_BRANCH_COMMAND, (ref?: string) => actions.deleteBranch(ref)),
     vscode.commands.registerCommand(CREATE_TASK_BRANCH_COMMAND, () => actions.createTaskBranch()),
+    vscode.commands.registerCommand(MOVE_DIRTY_TO_TASK_COMMAND, () => actions.moveDirtyToTaskBranch()),
     vscode.commands.registerCommand(VERIFY_TASK_BRANCH_COMMAND, () => actions.verifyBranchForTask()),
     vscode.commands.registerCommand(SETUP_AGENT_RULES_COMMAND, () => actions.setupAgentRules()),
     vscode.commands.registerCommand(CREATE_WORKTREE_COMMAND, (ref?: string) => actions.createWorktree(ref)),
@@ -45,6 +51,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand(REMOVE_WORKTREE_COMMAND, (wtPath?: string) => actions.removeWorktree(wtPath)),
     vscode.commands.registerCommand(DIAGNOSE_ENV_COMMAND, () => actions.diagnoseEnvironment()),
     vscode.commands.registerCommand(SWITCH_REPO_COMMAND, (root?: string) => actions.switchRepository(root)),
+    vscode.commands.registerCommand(OPEN_REPO_WINDOW_COMMAND, (root?: string) => actions.openRepositoryInWindow(root)),
   );
 
   await repos.start();
@@ -53,8 +60,3 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 export function deactivate(): void {
   // los recursos se liberan mediante context.subscriptions
 }
-
-
-
-
-

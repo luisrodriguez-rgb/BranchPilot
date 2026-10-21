@@ -18,6 +18,7 @@ interface VsCodeApi {
 interface PersistedState {
   filter: FilterId;
   query: string;
+  onlyActiveRepos?: boolean;
 }
 declare function acquireVsCodeApi(): VsCodeApi;
 
@@ -51,13 +52,14 @@ const saved = vscode.getState();
 const ui = {
   filter: saved?.filter ?? ('all' as FilterId),
   query: saved?.query ?? '',
+  onlyActiveRepos: saved?.onlyActiveRepos ?? false,
   selectedRef: undefined as string | undefined,
   panel: { kind: 'empty' } as PanelState,
   visible: [] as BranchInfo[],
 };
 
 function persist(): void {
-  vscode.setState({ filter: ui.filter, query: ui.query });
+  vscode.setState({ filter: ui.filter, query: ui.query, onlyActiveRepos: ui.onlyActiveRepos });
 }
 
 const card = new HoverCard({
@@ -337,6 +339,24 @@ function renderHeader(repo: RepoState, protectedNow: boolean): void {
 
   taskBar.append(taskBtn, precheckBtn, rulesBtn);
 
+  if (protectedNow && isDirty(wt)) {
+    const rescueBtn = h(
+      'button',
+      {
+        class: 'task-btn rescue',
+        type: 'button',
+        title: 'Trasladar los cambios actuales sin guardar hacia una nueva rama de tarea',
+      },
+      icon(ICON_SWITCH, 'icon'),
+      h('span', {}, 'Mover cambios a rama de tarea…'),
+    );
+    rescueBtn.addEventListener('click', () => {
+      card.hide();
+      vscode.postMessage({ type: 'moveDirtyToTaskBranch' });
+    });
+    taskBar.append(rescueBtn);
+  }
+
   const sections: Node[] = [
     h('div', { class: 'current-top' }, h('span', { class: 'eyebrow' }, 'Rama actual'), h('span', { class: 'repo-name' }, repo.name)),
     h('div', { class: 'current-name' }, icon(ICON_BRANCH, 'icon'), h('span', { class: 'name-text', title: name }, name)),
@@ -441,6 +461,10 @@ function renderChips(counts: Record<FilterId, number>): void {
   );
 }
 
+function hasPendingActivity(r: RepoOverview): boolean {
+  return r.dirty || r.unmergedLocalBranches > 0 || r.worktreesCount > 1;
+}
+
 function renderRepos(repositories: RepoOverview[]): void {
   if (!reposEl) return;
   if (repositories.length <= 1) {
@@ -450,8 +474,35 @@ function renderRepos(repositories: RepoOverview[]): void {
   }
 
   reposEl.hidden = false;
+  const activeCount = repositories.filter(hasPendingActivity).length;
+  const visibleRepos = ui.onlyActiveRepos
+    ? repositories.filter((r) => r.isActive || hasPendingActivity(r))
+    : repositories;
+
+  const filterToggle = h(
+    'button',
+    {
+      class: `repos-filter-btn${ui.onlyActiveRepos ? ' active' : ''}`,
+      type: 'button',
+      title: 'Filtrar repositorios con cambios sin guardar, ramas sin fusionar o worktrees paralelos',
+    },
+    ui.onlyActiveRepos ? `Con actividad (${activeCount})` : `Filtrar activos (${activeCount}/${repositories.length})`,
+  );
+  filterToggle.addEventListener('click', () => {
+    ui.onlyActiveRepos = !ui.onlyActiveRepos;
+    persist();
+    renderRepos(repositories);
+  });
+
+  const top = h(
+    'div',
+    { class: 'repos-header' },
+    h('span', { class: 'repos-title' }, `Radar Multi-Repo (${repositories.length})`),
+    filterToggle,
+  );
+
   const list = h('div', { class: 'repos-list', role: 'tablist', 'aria-label': 'Seleccionar repositorio' });
-  for (const r of repositories) {
+  for (const r of visibleRepos) {
     const branchLabel = r.detached ? `HEAD@${r.shortHash ?? '—'}` : (r.branch ?? 'HEAD');
     const tooltipParts = [
       `${r.name} (${r.root})`,
@@ -480,12 +531,26 @@ function renderRepos(repositories: RepoOverview[]): void {
         vscode.postMessage({ type: 'selectRepo', root: r.root });
       }
     });
-    list.append(pill);
+
+    const openWindowBtn = h(
+      'button',
+      {
+        class: 'repo-open-btn',
+        type: 'button',
+        title: `Abrir ${r.name} en una nueva ventana del IDE`,
+        'aria-label': `Abrir ${r.name} en nueva ventana`,
+      },
+      icon(ICON_WINDOW, 'icon'),
+    );
+    openWindowBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      card.hide();
+      vscode.postMessage({ type: 'openRepoInWindow', root: r.root });
+    });
+
+    list.append(h('div', { class: 'repo-card' }, pill, openWindowBtn));
   }
-  reposEl.replaceChildren(
-    h('div', { class: 'repos-title' }, `Repositorios (${repositories.length})`),
-    list,
-  );
+  reposEl.replaceChildren(top, list);
 }
 
 function renderFooter(repo: RepoState): void {

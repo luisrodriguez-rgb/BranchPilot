@@ -60,6 +60,9 @@ export class BranchPanelProvider implements vscode.WebviewViewProvider, vscode.D
         case 'createTaskBranch':
           void this.actions.createTaskBranch();
           break;
+        case 'moveDirtyToTaskBranch':
+          void this.actions.moveDirtyToTaskBranch();
+          break;
         case 'verifyBranchForTask':
           void this.actions.verifyBranchForTask();
           break;
@@ -77,6 +80,9 @@ export class BranchPanelProvider implements vscode.WebviewViewProvider, vscode.D
           break;
         case 'selectRepo':
           void this.repos.selectRepository(message.root);
+          break;
+        case 'openRepoInWindow':
+          void this.actions.openRepositoryInWindow(message.root);
           break;
       }
     });

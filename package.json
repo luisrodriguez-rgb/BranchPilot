@@ -81,6 +81,10 @@
         "title": "BranchPilot: Crear rama para esta tarea (IA)…"
       },
       {
+        "command": "branchpilot.moveDirtyToTaskBranch",
+        "title": "BranchPilot: Mover cambios sin guardar a una nueva rama de tarea…"
+      },
+      {
         "command": "branchpilot.verifyBranchForTask",
         "title": "BranchPilot: Verificar rama antes de delegar al agente"
       },
@@ -107,6 +111,10 @@
       {
         "command": "branchpilot.switchRepository",
         "title": "BranchPilot: Cambiar de repositorio en el workspace…"
+      },
+      {
+        "command": "branchpilot.openRepositoryInWindow",
+        "title": "BranchPilot: Abrir repositorio en nueva ventana…"
       }
     ],
     "configuration": {
@@ -152,6 +160,30 @@
           },
           "default": [],
           "description": "Rutas absolutas de carpetas adicionales donde buscar repositorios Git para el dashboard multi-repositorio."
+        },
+        "branchpilot.worktree.copyIgnoredFiles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            ".env",
+            ".env.local",
+            ".env.development",
+            ".env.development.local",
+            ".env.test"
+          ],
+          "description": "Archivos de entorno ignorados por Git que se copian automáticamente al crear un nuevo worktree paralelo."
+        },
+        "branchpilot.worktree.linkNodeModules": {
+          "type": "boolean",
+          "default": true,
+          "description": "Crear enlace simbólico de node_modules en el nuevo worktree paralelo si existe en el repositorio principal."
+        },
+        "branchpilot.autoGuard.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Mostrar alerta reactiva cuando se detecten ediciones sobre una rama protegida (main/master) ofreciendo mover los cambios a una nueva rama de tarea."
         }
       }
     }

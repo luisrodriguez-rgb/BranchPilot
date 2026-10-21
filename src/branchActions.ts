@@ -3,6 +3,7 @@ import path from 'node:path';
 import * as vscode from 'vscode';
 import { evaluateAgentPrecheck, suggestTaskBranchName, upsertAgentRuleInContent } from './ai/taskContext';
 import { GitError } from './git/runner';
+import { bootstrapWorktree } from './git/worktreeBootstrap';
 import { evaluateGuard, validateBranchName } from './guards/branchGuards';
 import type { ConfirmPrompt, DirtyPrompt, DirtyResolution, GuardAction, GuardContext } from './guards/branchGuards';
 import type { RepoService } from './repoService';
@@ -15,6 +16,7 @@ export const CREATE_BRANCH_COMMAND = 'branchpilot.createBranch';
 export const RENAME_BRANCH_COMMAND = 'branchpilot.renameBranch';
 export const DELETE_BRANCH_COMMAND = 'branchpilot.deleteBranch';
 export const CREATE_TASK_BRANCH_COMMAND = 'branchpilot.createTaskBranch';
+export const MOVE_DIRTY_TO_TASK_COMMAND = 'branchpilot.moveDirtyToTaskBranch';
 export const VERIFY_TASK_BRANCH_COMMAND = 'branchpilot.verifyBranchForTask';
 export const SETUP_AGENT_RULES_COMMAND = 'branchpilot.setupAgentRules';
 export const CREATE_WORKTREE_COMMAND = 'branchpilot.createWorktree';
@@ -22,6 +24,7 @@ export const OPEN_WORKTREE_COMMAND = 'branchpilot.openWorktree';
 export const REMOVE_WORKTREE_COMMAND = 'branchpilot.removeWorktree';
 export const DIAGNOSE_ENV_COMMAND = 'branchpilot.diagnoseEnvironment';
 export const SWITCH_REPO_COMMAND = 'branchpilot.switchRepository';
+export const OPEN_REPO_WINDOW_COMMAND = 'branchpilot.openRepositoryInWindow';
 
 function formatGitFailure(error: unknown): string {
   if (error instanceof GitError && error.stderr.trim()) {
@@ -341,6 +344,47 @@ export class BranchActions {
   }
 
   /**
+   * Mueve en un solo paso los cambios sin guardar del árbol de trabajo actual hacia una nueva
+   * rama de tarea a partir de `HEAD` (usado por el Auto-Guard reactivo cuando el agente edita sobre `main`).
+   */
+  async moveDirtyToTaskBranch(): Promise<void> {
+    await this.repos.refresh();
+    const state = this.requireState();
+    if (!state) return;
+
+    const existingLocal = new Set(state.branches.filter((b) => b.kind === 'local').map((b) => b.name));
+    const defaultSuggestion = suggestTaskBranchName('tarea en curso', existingLocal);
+
+    const rawInput = await vscode.window.showInputBox({
+      title: `Mover cambios sin guardar a una nueva rama de tarea`,
+      prompt: 'Describe la tarea o escribe directamente el nombre de la nueva rama (los cambios actuales se trasladarán a ella)',
+      value: defaultSuggestion,
+      ignoreFocusOut: true,
+      validateInput: (val) => {
+        const trimmed = val.trim();
+        if (!trimmed) return 'Introduce una descripción o nombre de rama.';
+        const candidate = trimmed.includes(' ') ? suggestTaskBranchName(trimmed, existingLocal) : trimmed;
+        const err = validateBranchName(candidate);
+        if (err) return err;
+        if (existingLocal.has(candidate)) return `Ya existe una rama local llamada «${candidate}».`;
+        return undefined;
+      },
+    });
+    const trimmed = rawInput?.trim();
+    if (!trimmed) return;
+
+    const finalName = trimmed.includes(' ') ? suggestTaskBranchName(trimmed, existingLocal) : trimmed;
+    try {
+      await this.repos.createBranch(finalName, 'HEAD');
+      void vscode.window.showInformationMessage(
+        `BranchPilot: Cambios trasladados a la nueva rama de tarea «${finalName}».`,
+      );
+    } catch (error) {
+      void vscode.window.showErrorMessage(`No se pudieron trasladar los cambios a «${finalName}»: ${formatGitFailure(error)}`);
+    }
+  }
+
+  /**
    * Pre-chequeo interactivo antes de delegar trabajo a un agente de IA:
    * muestra la rama actual y ofrece crear una rama de tarea si se está en una rama protegida o HEAD desacoplado.
    */
@@ -544,9 +588,19 @@ export class BranchActions {
 
     try {
       const createdPath = await this.repos.addWorktree(targetDir, { newBranch, refOrBase });
+      const settings = readSettings();
+      const boot = await bootstrapWorktree(state.root, createdPath, {
+        copyFiles: settings.worktreeCopyFiles,
+        linkNodeModules: settings.worktreeLinkNodeModules,
+      });
+      const extras: string[] = [];
+      if (boot.copiedFiles.length > 0) extras.push(`copiados: ${boot.copiedFiles.join(', ')}`);
+      if (boot.linkedNodeModules) extras.push('node_modules enlazado');
+      const extraText = extras.length > 0 ? ` (${extras.join(' · ')})` : '';
+
       const openOpt = 'Abrir en nueva ventana';
       const choice = await vscode.window.showInformationMessage(
-        `BranchPilot: Worktree creado en «${createdPath}».`,
+        `BranchPilot: Worktree creado en «${createdPath}»${extraText}.`,
         openOpt,
       );
       if (choice === openOpt) {
@@ -700,6 +754,43 @@ export class BranchActions {
     if (picked) {
       await this.repos.selectRepository(picked.root);
     }
+  }
+
+  /** Abre cualquiera de los repositorios descubiertos en una nueva ventana del IDE. */
+  async openRepositoryInWindow(root?: string): Promise<void> {
+    let targetRoot = root;
+    if (!targetRoot) {
+      await this.repos.refresh();
+      const list = this.repos.repositories;
+      if (list.length === 0) {
+        void vscode.window.showWarningMessage('BranchPilot: No se detectaron repositorios Git.');
+        return;
+      }
+      const picked = await vscode.window.showQuickPick(
+        list.map((r) => {
+          const branchLabel = r.detached ? `HEAD (${r.shortHash ?? 'desacoplado'})` : (r.branch ?? 'HEAD');
+          const statusParts = [
+            r.dirty ? `${r.changesCount} cambios sin guardar` : 'limpio',
+            r.unmergedLocalBranches > 0 ? `${r.unmergedLocalBranches} sin fusionar` : 'todo fusionado',
+            r.worktreesCount > 1 ? `${r.worktreesCount} worktrees` : undefined,
+          ].filter(Boolean);
+          return {
+            label: `${r.dirty || r.unmergedLocalBranches > 0 ? '$(flame) ' : '$(repo) '}${r.name}`,
+            description: `Rama: ${branchLabel}`,
+            detail: `${statusParts.join(' · ')} — ${r.root}`,
+            root: r.root,
+          };
+        }),
+        {
+          title: 'Abrir repositorio en nueva ventana',
+          placeHolder: 'Selecciona el repositorio que deseas abrir en una ventana independiente',
+        },
+      );
+      if (!picked) return;
+      targetRoot = picked.root;
+    }
+
+    await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(targetRoot), true);
   }
 }
 
