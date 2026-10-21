@@ -2,12 +2,14 @@ import * as vscode from 'vscode';
 import { GitRepository } from './git/repository';
 import { watchGitDir } from './git/watcher';
 import type { Disposable } from './git/watcher';
+import { readSettings } from './settings';
 import { debounce } from './shared/debounce';
-import type { CommitSummary, RepoState } from './shared/types';
+import { discoverGitRoots, summarizeRepoState } from './shared/multiRepo';
+import type { CommitSummary, RepoOverview, RepoState } from './shared/types';
 
 /**
- * Mantiene el estado del repositorio del workspace y avisa de cambios.
- * Un repositorio por ventana (el del primer workspace folder o el del editor activo).
+ * Mantiene el estado del repositorio activo y el resumen de todos los repositorios
+ * descubiertos en el workspace o en `branchpilot.scanPaths`.
  */
 export class RepoService implements vscode.Disposable {
   private readonly emitter = new vscode.EventEmitter<RepoState | undefined>();
@@ -16,6 +18,8 @@ export class RepoService implements vscode.Disposable {
   private repo: GitRepository | undefined;
   private watcher: Disposable | undefined;
   private current: RepoState | undefined;
+  private allRepos: RepoOverview[] = [];
+  private manualRoot: string | undefined;
   private inFlight: Promise<void> | undefined;
   private pending = false;
   private readonly disposables: vscode.Disposable[] = [];
@@ -25,10 +29,17 @@ export class RepoService implements vscode.Disposable {
     return this.current;
   }
 
+  get repositories(): RepoOverview[] {
+    return this.allRepos;
+  }
+
   async start(): Promise<void> {
     this.disposables.push(
       vscode.workspace.onDidChangeWorkspaceFolders(() => void this.resolveRepository()),
-      vscode.window.onDidChangeActiveTextEditor(() => void this.resolveRepository()),
+      vscode.window.onDidChangeActiveTextEditor(() => void this.onActiveEditorChanged()),
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration('branchpilot.scanPaths')) void this.resolveRepository();
+      }),
       vscode.workspace.onDidSaveTextDocument(() => this.scheduleRefresh()),
       vscode.workspace.onDidCreateFiles(() => this.scheduleRefresh()),
       vscode.workspace.onDidDeleteFiles(() => this.scheduleRefresh()),
@@ -39,7 +50,22 @@ export class RepoService implements vscode.Disposable {
     await this.resolveRepository();
   }
 
+  private async onActiveEditorChanged(): Promise<void> {
+    if (this.manualRoot) return;
+    await this.resolveRepository();
+  }
+
+  /** Selecciona explícitamente un repositorio descubierto como el activo del panel y la barra de estado. */
+  async selectRepository(root: string): Promise<void> {
+    const next = await GitRepository.open(root);
+    if (!next) return;
+    this.manualRoot = next.root;
+    this.switchActiveRepo(next);
+    await this.refresh();
+  }
+
   private candidateFolder(): string | undefined {
+    if (this.manualRoot) return this.manualRoot;
     const folders = vscode.workspace.workspaceFolders ?? [];
     const active = vscode.window.activeTextEditor?.document.uri;
     if (active?.scheme === 'file') {
@@ -49,17 +75,30 @@ export class RepoService implements vscode.Disposable {
     return folders[0]?.uri.fsPath;
   }
 
-  private async resolveRepository(): Promise<void> {
-    const folder = this.candidateFolder();
-    const next = folder ? await GitRepository.open(folder) : undefined;
+  private switchActiveRepo(next: GitRepository | undefined): void {
     if (next?.root === this.repo?.root && next?.gitDir === this.repo?.gitDir) return;
-
     this.watcher?.dispose();
     this.watcher = undefined;
     this.repo = next;
     this.current = undefined;
     if (next) this.watcher = watchGitDir(next.gitDir, () => this.scheduleRefresh());
+  }
+
+  private async resolveRepository(): Promise<void> {
+    const folder = this.candidateFolder();
+    let next = folder ? await GitRepository.open(folder) : undefined;
+    if (!next) {
+      const roots = await this.discoverCandidates();
+      if (roots[0]) next = await GitRepository.open(roots[0]);
+    }
+    this.switchActiveRepo(next);
     await this.refresh();
+  }
+
+  private async discoverCandidates(): Promise<string[]> {
+    const workspaceDirs = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
+    const extraDirs = readSettings().scanPaths;
+    return discoverGitRoots([...workspaceDirs, ...extraDirs]);
   }
 
   private requireRepo(): GitRepository {
@@ -108,7 +147,6 @@ export class RepoService implements vscode.Disposable {
     await this.refresh();
   }
 
-
   /** Refresca el estado; las llamadas simultáneas se agrupan en una sola ejecución extra. */
   refresh(): Promise<void> {
     if (this.inFlight) {
@@ -128,15 +166,44 @@ export class RepoService implements vscode.Disposable {
   private async doRefresh(): Promise<void> {
     if (!this.repo) {
       this.current = undefined;
+      this.allRepos = [];
       this.emitter.fire(undefined);
       return;
     }
+    const { staleDays } = readSettings();
+    const nowMs = Date.now();
     try {
       this.current = await this.repo.snapshot();
     } catch (error) {
       console.error('[BranchPilot] no se pudo leer el repositorio', error);
       this.current = undefined;
     }
+
+    try {
+      const roots = await this.discoverCandidates();
+      const activeRoot = this.current?.root;
+      if (activeRoot && !roots.includes(activeRoot)) roots.unshift(activeRoot);
+
+      const overviews: RepoOverview[] = [];
+      for (const root of roots) {
+        if (this.current && root === this.current.root) {
+          overviews.push(summarizeRepoState(this.current, { isActive: true, nowMs, staleDays }));
+          continue;
+        }
+        const other = await GitRepository.open(root);
+        if (!other) continue;
+        try {
+          const snap = await other.snapshot();
+          overviews.push(summarizeRepoState(snap, { isActive: false, nowMs, staleDays }));
+        } catch {
+          // ignorar repositorios secundarios dañados
+        }
+      }
+      this.allRepos = overviews;
+    } catch {
+      this.allRepos = this.current ? [summarizeRepoState(this.current, { isActive: true, nowMs, staleDays })] : [];
+    }
+
     this.emitter.fire(this.current);
   }
 
@@ -147,3 +214,4 @@ export class RepoService implements vscode.Disposable {
     for (const d of this.disposables) d.dispose();
   }
 }
+

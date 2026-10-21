@@ -56,6 +56,24 @@ export interface WorktreeInfo {
   prunable: boolean;
 }
 
+export interface RepoOverview {
+  root: string;
+  name: string;
+  branch?: string;
+  detached: boolean;
+  shortHash?: string;
+  baseBranch?: string;
+  dirty: boolean;
+  changesCount: number;
+  conflicted: number;
+  operation?: GitOperation;
+  localBranches: number;
+  unmergedLocalBranches: number;
+  staleLocalBranches: number;
+  worktreesCount: number;
+  isActive: boolean;
+}
+
 export interface RepoState {
   root: string;
   name: string;
@@ -71,4 +89,5 @@ export interface RepoState {
 export function isDirty(status: WorkingTreeStatus): boolean {
   return status.staged + status.unstaged + status.untracked + status.conflicted > 0;
 }
+
 
