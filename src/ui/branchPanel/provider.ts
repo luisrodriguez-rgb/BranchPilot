@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import type { BranchActions } from '../../branchActions';
 import type { RepoService } from '../../repoService';
 import { readSettings } from '../../settings';
 import { isFromWebview } from '../../shared/messages';
@@ -14,6 +15,7 @@ export class BranchPanelProvider implements vscode.WebviewViewProvider, vscode.D
   constructor(
     private readonly extensionUri: vscode.Uri,
     private readonly repos: RepoService,
+    private readonly actions: BranchActions,
   ) {
     this.subscriptions.push(
       repos.onDidChange(() => this.push()),
@@ -33,9 +35,29 @@ export class BranchPanelProvider implements vscode.WebviewViewProvider, vscode.D
 
     view.webview.onDidReceiveMessage((message: unknown) => {
       if (!isFromWebview(message)) return;
-      if (message.type === 'ready') this.push();
-      else if (message.type === 'refresh') void this.repos.refresh();
-      else if (message.type === 'requestCommits') void this.sendCommits(message.ref);
+      switch (message.type) {
+        case 'ready':
+          this.push();
+          break;
+        case 'refresh':
+          void this.repos.refresh();
+          break;
+        case 'requestCommits':
+          void this.sendCommits(message.ref);
+          break;
+        case 'checkout':
+          void this.actions.checkout(message.ref);
+          break;
+        case 'createBranch':
+          void this.actions.createBranch(message.base);
+          break;
+        case 'renameBranch':
+          void this.actions.renameBranch(message.ref);
+          break;
+        case 'deleteBranch':
+          void this.actions.deleteBranch(message.ref);
+          break;
+      }
     });
     view.onDidChangeVisibility(() => {
       if (view.visible) {

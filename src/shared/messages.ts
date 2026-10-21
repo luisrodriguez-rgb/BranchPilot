@@ -13,11 +13,28 @@ export type ToWebview =
 export type FromWebview =
   | { type: 'ready' }
   | { type: 'refresh' }
-  | { type: 'requestCommits'; ref: string };
+  | { type: 'requestCommits'; ref: string }
+  | { type: 'checkout'; ref: string }
+  | { type: 'createBranch'; base?: string }
+  | { type: 'renameBranch'; ref: string }
+  | { type: 'deleteBranch'; ref: string };
 
 export function isFromWebview(value: unknown): value is FromWebview {
   if (typeof value !== 'object' || value === null) return false;
-  const message = value as { type?: unknown; ref?: unknown };
-  if (message.type === 'ready' || message.type === 'refresh') return true;
-  return message.type === 'requestCommits' && typeof message.ref === 'string';
+  const message = value as { type?: unknown; ref?: unknown; base?: unknown };
+  switch (message.type) {
+    case 'ready':
+    case 'refresh':
+      return true;
+    case 'requestCommits':
+    case 'checkout':
+    case 'renameBranch':
+    case 'deleteBranch':
+      return typeof message.ref === 'string' && message.ref.length > 0;
+    case 'createBranch':
+      return message.base === undefined || typeof message.base === 'string';
+    default:
+      return false;
+  }
 }
+

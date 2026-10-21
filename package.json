@@ -56,6 +56,22 @@
       {
         "command": "branchpilot.focusPanel",
         "title": "BranchPilot: Mostrar panel de ramas"
+      },
+      {
+        "command": "branchpilot.checkout",
+        "title": "BranchPilot: Cambiar de rama…"
+      },
+      {
+        "command": "branchpilot.createBranch",
+        "title": "BranchPilot: Crear nueva rama…"
+      },
+      {
+        "command": "branchpilot.renameBranch",
+        "title": "BranchPilot: Renombrar rama…"
+      },
+      {
+        "command": "branchpilot.deleteBranch",
+        "title": "BranchPilot: Eliminar rama local…"
       }
     ],
     "configuration": {

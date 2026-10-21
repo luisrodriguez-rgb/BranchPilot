@@ -36,6 +36,14 @@ const ICON_BRANCH =
   '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="4" cy="3.5" r="1.6"/><circle cx="4" cy="12.5" r="1.6"/><circle cx="12" cy="6" r="1.6"/><path d="M4 5.1v5.8"/><path d="M12 7.6c0 2.6-3.2 2.6-7 4.4"/></svg>';
 const ICON_REFRESH =
   '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.7-4"/><path d="M13.5 2.5v3h-3"/></svg>';
+const ICON_PLUS =
+  '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10"/><path d="M3 8h10"/></svg>';
+const ICON_SWITCH =
+  '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h9"/><path d="M9 4.5 12.5 8 9 11.5"/></svg>';
+const ICON_EDIT =
+  '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.2 2.5 13.5 4.8 5.5 12.8 2.5 13.5 3.2 10.5Z"/></svg>';
+const ICON_TRASH =
+  '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4.5h10"/><path d="M6 4.5V3h4v1.5"/><path d="M4.5 4.5 5.2 13h5.6l.7-8.5"/></svg>';
 
 const saved = vscode.getState();
 const ui = {
@@ -97,7 +105,28 @@ function buildShell(): void {
     }
   });
 
-  const refresh = h('button', { class: 'icon-button', title: 'Actualizar', 'aria-label': 'Actualizar ramas' });
+  const createBtn = h(
+    'button',
+    {
+      class: 'action-primary',
+      type: 'button',
+      title: 'Crear nueva rama eligiendo la base',
+      'aria-label': 'Crear nueva rama',
+    },
+    icon(ICON_PLUS, 'icon'),
+    h('span', {}, 'Nueva'),
+  );
+  createBtn.addEventListener('click', () => {
+    card.hide();
+    vscode.postMessage({ type: 'createBranch' });
+  });
+
+  const refresh = h('button', {
+    class: 'icon-button',
+    type: 'button',
+    title: 'Actualizar',
+    'aria-label': 'Actualizar ramas',
+  });
   refresh.append(icon(ICON_REFRESH, 'icon'));
   refresh.addEventListener('click', () => vscode.postMessage({ type: 'refresh' }));
 
@@ -117,12 +146,21 @@ function buildShell(): void {
   listEl.addEventListener('keydown', onListKey);
   new ResizeObserver(() => renderRows()).observe(listEl);
 
-  app.append(headerEl, h('div', { class: 'toolbar' }, searchInput, refresh), chipsEl, summaryEl, listEl, footerEl);
+  app.append(
+    headerEl,
+    h('div', { class: 'toolbar' }, searchInput, createBtn, refresh),
+    chipsEl,
+    summaryEl,
+    listEl,
+    footerEl,
+  );
 }
 
 function onListKey(e: KeyboardEvent): void {
   const page = Math.max(1, Math.floor((listEl?.clientHeight ?? ROW_HEIGHT) / ROW_HEIGHT) - 1);
   const index = selectedIndex();
+  const selectedBranch = index >= 0 ? ui.visible[index] : undefined;
+  const ctx = currentRepo();
   switch (e.key) {
     case 'ArrowDown':
       e.preventDefault();
@@ -148,6 +186,32 @@ function onListKey(e: KeyboardEvent): void {
     case 'End':
       e.preventDefault();
       moveSelection(ui.visible.length - 1);
+      break;
+    case 'Enter':
+      if (selectedBranch && !selectedBranch.isCurrent) {
+        e.preventDefault();
+        card.hide();
+        vscode.postMessage({ type: 'checkout', ref: selectedBranch.fullRef });
+      }
+      break;
+    case 'F2':
+      if (selectedBranch && selectedBranch.kind === 'local') {
+        e.preventDefault();
+        card.hide();
+        vscode.postMessage({ type: 'renameBranch', ref: selectedBranch.fullRef });
+      }
+      break;
+    case 'Delete':
+      if (
+        selectedBranch &&
+        selectedBranch.kind === 'local' &&
+        !selectedBranch.isCurrent &&
+        selectedBranch.name !== ctx?.repo.baseBranch
+      ) {
+        e.preventDefault();
+        card.hide();
+        vscode.postMessage({ type: 'deleteBranch', ref: selectedBranch.fullRef });
+      }
       break;
   }
 }
@@ -317,6 +381,23 @@ function renderRows(): void {
   else listEl.removeAttribute('aria-activedescendant');
 }
 
+function makeRowAction(svg: string, title: string, onClick: () => void, danger = false): HTMLButtonElement {
+  const btn = h('button', {
+    class: `row-action${danger ? ' danger' : ''}`,
+    type: 'button',
+    title,
+    'aria-label': title,
+    tabindex: '-1',
+  });
+  btn.append(icon(svg, 'icon'));
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    card.hide();
+    onClick();
+  });
+  return btn;
+}
+
 function renderRow(
   branch: BranchInfo,
   index: number,
@@ -340,6 +421,37 @@ function renderRow(
     right.append(h('span', { class: 'ahead' }, `↑${branch.ahead}`), h('span', { class: 'behind' }, `↓${branch.behind ?? 0}`));
   }
 
+  const actions = h('span', { class: 'row-actions' });
+  if (!branch.isCurrent) {
+    actions.append(
+      makeRowAction(ICON_SWITCH, `Cambiar a ${branch.name}`, () =>
+        vscode.postMessage({ type: 'checkout', ref: branch.fullRef }),
+      ),
+    );
+  }
+  actions.append(
+    makeRowAction(ICON_PLUS, `Nueva rama desde ${branch.name}`, () =>
+      vscode.postMessage({ type: 'createBranch', base: branch.name }),
+    ),
+  );
+  if (branch.kind === 'local') {
+    actions.append(
+      makeRowAction(ICON_EDIT, `Renombrar ${branch.name}`, () =>
+        vscode.postMessage({ type: 'renameBranch', ref: branch.fullRef }),
+      ),
+    );
+    if (!branch.isCurrent && branch.name !== baseBranch) {
+      actions.append(
+        makeRowAction(
+          ICON_TRASH,
+          `Eliminar ${branch.name}`,
+          () => vscode.postMessage({ type: 'deleteBranch', ref: branch.fullRef }),
+          true,
+        ),
+      );
+    }
+  }
+
   const row = h(
     'div',
     {
@@ -359,6 +471,7 @@ function renderRow(
       h('div', { class: 'row-sub' }, `${branch.lastCommit.subject || '—'} · ${relativeTime(branch.lastCommit.date, now)}`),
     ),
     right,
+    actions,
   );
   row.style.height = `${ROW_HEIGHT}px`;
   row.addEventListener('click', () => {
@@ -367,6 +480,12 @@ function renderRow(
     renderRows();
     const fresh = document.getElementById(id);
     if (fresh) card.scheduleShow(branch, fresh, baseBranch, true);
+  });
+  row.addEventListener('dblclick', () => {
+    if (!branch.isCurrent) {
+      card.hide();
+      vscode.postMessage({ type: 'checkout', ref: branch.fullRef });
+    }
   });
   row.addEventListener('mouseenter', () => card.scheduleShow(branch, row, baseBranch));
   row.addEventListener('mouseleave', () => card.scheduleHide());
@@ -413,3 +532,4 @@ setInterval(() => {
 }, 60_000);
 
 vscode.postMessage({ type: 'ready' });
+

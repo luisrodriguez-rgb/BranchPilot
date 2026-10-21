@@ -188,6 +188,27 @@ body {
   outline-offset: -1px;
 }
 
+.action-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 9px;
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.action-primary:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
 .icon-button {
   display: inline-flex;
   align-items: center;
@@ -382,6 +403,45 @@ button:focus-visible,
   font-size: 11px;
   line-height: 1.3;
 }
+
+.row-actions {
+  display: none;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+}
+
+.row:hover .row-actions,
+.row.selected .row-actions {
+  display: inline-flex;
+}
+
+.row-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.row-action:hover {
+  opacity: 1;
+  background: var(--vscode-toolbar-hoverBackground);
+  border-color: var(--bp-border);
+}
+
+.row-action.danger:hover {
+  color: var(--bp-red);
+  border-color: color-mix(in srgb, var(--bp-red) 55%, transparent);
+}
+
 
 .no-results,
 .empty {
