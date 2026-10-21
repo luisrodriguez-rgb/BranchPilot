@@ -6,6 +6,9 @@ import { relativeTime } from '../../../shared/time';
 import type { BranchInfo, RepoState } from '../../../shared/types';
 import { isDirty } from '../../../shared/types';
 import { computeWindow, scrollTopToReveal } from '../../../shared/virtual';
+import { h, icon } from './dom';
+import type { Child } from './dom';
+import { HoverCard } from './hoverCard';
 
 interface VsCodeApi {
   postMessage(message: FromWebview): void;
@@ -47,26 +50,10 @@ function persist(): void {
   vscode.setState({ filter: ui.filter, query: ui.query });
 }
 
-type Child = Node | string | undefined | false;
-function h<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  props: Record<string, string> = {},
-  ...children: Child[]
-): HTMLElementTagNameMap[K] {
-  const el = document.createElement(tag);
-  for (const [key, value] of Object.entries(props)) el.setAttribute(key, value);
-  for (const child of children) {
-    if (child === undefined || child === false) continue;
-    el.append(typeof child === 'string' ? document.createTextNode(child) : child);
-  }
-  return el;
-}
-
-function icon(svg: string, className: string): HTMLElement {
-  const span = h('span', { class: className });
-  span.innerHTML = svg; // constantes estáticas, sin datos del repositorio
-  return span;
-}
+const card = new HoverCard({
+  host: document.body,
+  requestCommits: (ref) => vscode.postMessage({ type: 'requestCommits', ref }),
+});
 
 const app = document.getElementById('app') as HTMLElement;
 
@@ -123,7 +110,10 @@ function buildShell(): void {
   listEl = h('div', { class: 'list', role: 'listbox', tabindex: '0', 'aria-label': 'Ramas' }, spacerEl);
   footerEl = h('footer', { class: 'footer' });
 
-  listEl.addEventListener('scroll', () => requestAnimationFrame(() => renderRows()));
+  listEl.addEventListener('scroll', () => {
+    card.hide();
+    requestAnimationFrame(() => renderRows());
+  });
   listEl.addEventListener('keydown', onListKey);
   new ResizeObserver(() => renderRows()).observe(listEl);
 
@@ -175,6 +165,8 @@ function moveSelection(index: number): void {
   ui.selectedRef = target.fullRef;
   listEl.scrollTop = scrollTopToReveal(clamped, listEl.scrollTop, listEl.clientHeight, ROW_HEIGHT);
   renderRows();
+  const row = document.getElementById(`opt-${clamped}`);
+  if (row) card.scheduleShow(target, row, currentRepo()?.repo.baseBranch, true);
 }
 
 function renderEmpty(): void {
@@ -373,7 +365,11 @@ function renderRow(
     ui.selectedRef = branch.fullRef;
     listEl?.focus();
     renderRows();
+    const fresh = document.getElementById(id);
+    if (fresh) card.scheduleShow(branch, fresh, baseBranch, true);
   });
+  row.addEventListener('mouseenter', () => card.scheduleShow(branch, row, baseBranch));
+  row.addEventListener('mouseleave', () => card.scheduleHide());
   return row;
 }
 
@@ -398,14 +394,22 @@ function renderAll(resetScroll: boolean): void {
 
 window.addEventListener('message', (event: MessageEvent<ToWebview>) => {
   const message = event.data;
+  if (message?.type === 'commits') {
+    card.setCommits(message.ref, message.commits, message.error);
+    return;
+  }
   if (message?.type !== 'state') return;
   ui.panel = message.state;
+  const ctx = currentRepo();
+  if (ctx) card.prune(ctx.repo.branches);
+  else card.hide();
+  card.hide();
   renderAll(false);
 });
 
 // Mantiene frescos los tiempos relativos sin pedir datos nuevos.
 setInterval(() => {
-  if (currentRepo()) renderAll(false);
+  if (currentRepo() && !card.visible) renderAll(false);
 }, 60_000);
 
 vscode.postMessage({ type: 'ready' });

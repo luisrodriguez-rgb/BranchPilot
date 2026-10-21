@@ -35,6 +35,7 @@ export class BranchPanelProvider implements vscode.WebviewViewProvider, vscode.D
       if (!isFromWebview(message)) return;
       if (message.type === 'ready') this.push();
       else if (message.type === 'refresh') void this.repos.refresh();
+      else if (message.type === 'requestCommits') void this.sendCommits(message.ref);
     });
     view.onDidChangeVisibility(() => {
       if (view.visible) {
@@ -52,6 +53,18 @@ export class BranchPanelProvider implements vscode.WebviewViewProvider, vscode.D
     if (!repo) return { kind: 'empty' };
     const settings = readSettings();
     return { kind: 'repo', repo, protection: settings.protection, staleDays: settings.staleDays };
+  }
+
+  private async sendCommits(ref: string): Promise<void> {
+    const known = this.repos.state?.branches.some((b) => b.fullRef === ref);
+    let message: ToWebview;
+    try {
+      if (!known) throw new Error('La rama ya no existe.');
+      message = { type: 'commits', ref, commits: await this.repos.recentCommits(ref) };
+    } catch (error) {
+      message = { type: 'commits', ref, commits: [], error: error instanceof Error ? error.message : String(error) };
+    }
+    void this.view?.webview.postMessage(message);
   }
 
   private push(): void {

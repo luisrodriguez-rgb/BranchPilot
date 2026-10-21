@@ -409,3 +409,131 @@ button:focus-visible,
     transition: none !important;
   }
 }
+
+/* ---- Tarjeta de detalle ---- */
+[hidden] {
+  display: none !important;
+}
+
+.hover-card {
+  position: fixed;
+  z-index: 10;
+  padding: 10px 12px 12px;
+  color: var(--vscode-editorHoverWidget-foreground, var(--vscode-foreground));
+  background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background, #252526));
+  border: 1px solid var(--vscode-editorHoverWidget-border, var(--bp-border));
+  border-radius: var(--bp-radius);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  animation: hc-in 0.12s ease-out;
+}
+
+@keyframes hc-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+
+.hc-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.hc-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hc-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--bp-green);
+}
+
+.hc-dot.remote {
+  background: var(--bp-purple);
+}
+
+.hc-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--bp-border);
+}
+
+.hc-tab {
+  padding: 3px 10px;
+  color: var(--bp-muted);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.hc-tab.active {
+  color: var(--vscode-foreground);
+  border-bottom-color: var(--vscode-focusBorder);
+}
+
+.hc-commit {
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+
+.hc-meta {
+  font-size: 12px;
+  color: var(--bp-muted);
+}
+
+.hc-facts {
+  margin: 8px 0 0;
+  padding-left: 16px;
+  font-size: 12px;
+}
+
+.hc-facts li {
+  margin: 2px 0;
+}
+
+.hc-commits {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.hc-commits li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 3px 0;
+  font-size: 12px;
+}
+
+.hc-subject {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hc-when {
+  flex: none;
+  color: var(--bp-muted);
+  font-size: 11px;
+}
+
+.hc-error {
+  color: var(--bp-red);
+  font-size: 12px;
+}
