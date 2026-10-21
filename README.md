@@ -13,8 +13,10 @@ Control visual y seguro de ramas de Git para el desarrollo asistido por IA. Func
 - **Contexto de Tarea con IA**:
   - Comando **«Crear rama para esta tarea (IA)…»**: infiere el prefijo (`feat/`, `fix/`, `refactor/`, `docs/`, `test/`, `chore/`) y genera un slug limpio a partir de la descripción de la tarea.
   - **Pre-chequeo IA**: verifica si estás en una rama protegida o con cambios pendientes antes de delegar trabajo al agente.
+  - **Auto-Guard reactivo en ramas protegidas**: detecta automáticamente si un agente de IA empieza a editar archivos sobre `main`/`master` sin haber cambiado de rama y ofrece trasladar todos los cambios sin guardar a una nueva rama de tarea con un solo clic.
   - **Reglas automáticas (`AGENTS.md`, `.clinerules`, `.cursorrules`)**: inyecta de forma idempotente instrucciones para que los agentes verifiquen la rama activa antes de editar archivos.
-- **Soporte de Worktrees Paralelos**: lista, crea, abre en nueva ventana y elimina `git worktree` secundarios para ejecutar múltiples agentes en paralelo sin interferencias.
+- **Soporte de Worktrees Paralelos con Bootstrap Instantáneo**: lista, crea, abre en nueva ventana y elimina `git worktree` secundarios para ejecutar múltiples agentes en paralelo, copiando automáticamente archivos `.env*` ignorados por Git y enlazando `node_modules` para que el nuevo entorno compile al instante.
+- **Radar Multi-Repositorio (~20+ repositorios)**: escanea carpetas del workspace y rutas configuradas (`branchpilot.scanPaths`), permite filtrar solo los repositorios con actividad pendiente (cambios sin guardar, ramas locales sin fusionar o worktrees paralelos) y abrir cualquiera en una nueva ventana del IDE con un clic.
 
 ---
 
