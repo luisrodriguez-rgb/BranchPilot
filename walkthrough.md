@@ -146,21 +146,34 @@ flowchart LR
 - **Higiene de `.vsix` e icono para Marketplace (`128x128`):**
   - Generado [media/icon.png](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/media/icon.png) (`128x128` RGBA) y depurado [.vscodeignore](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/.vscodeignore) para excluir todos los archivos de desarrollo y pruebas.
 
+### Fase 12 · Rediseño Visual de Identidad, Tooltips Flotantes Instantáneos, Integración con Source Control (`scm`) y Commit Rápido
+
+- **Nuevo Logo e Identidad Diferenciadora ([`media/icon.svg`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/media/icon.svg) y [`media/icon.png`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/media/icon.png)):**
+  - Se sustituyó el glifo genérico de bifurcación de Git por un emblema de **Nave Chevron de Navegación / Ala Delta Aeroespacial** que dirige trayectorias hacia dos balizas radar (`waypoints`).
+  - En la barra de actividad del IDE se distingue al instante del icono nativo de Source Control.
+  - En el Marketplace (`media/icon.png`, `128x128` px) cuenta con degradado cian-esmeralda sobre fondo azul medianoche y supersampling subpixel antialias.
+- **Tooltips Flotantes Instantáneos con CSS Puro ([`media/webview.css`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/media/webview.css#L872-L960)):**
+  - Eliminado el retraso de 1+ segundo del `title` de HTML en el Webview mediante `[data-tooltip]` con microanimaciones CSS de 100 ms y variables nativas del tema (`--vscode-editorHoverWidget-background`, `--vscode-editorHoverWidget-border`).
+  - Soportan orientación dinámica (`data-tooltip-pos="left"` o `"bottom"`) en la barra de herramientas, worktrees, chips y botones de fila.
+- **Corrección de "Spanglish" y Simplificación de Badges:**
+  - Se internacionalizaron todas las etiquetas de fila y el pie de página mediante [`UiStrings`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/src/shared/i18n.ts#L33-L70).
+  - Eliminada la saturación de 4 badges en `main` (`[local] [actual] [base] [protegida]`): ahora las ramas locales no repiten innecesariamente `[local]`, y en `main` solo se muestran las etiquetas críticas indispensables (`[actual]` y `[protegida]`).
+- **Caja Rápida de Commit y Puente a Source Control:**
+  - Cuando el árbol de trabajo tiene cambios sin guardar (`isDirty`), la tarjeta de rama activa despliega un input inline + botón **«Commit»** (ejecuta [`commitAll`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/src/git/repository.ts#L262-L270)) y un botón con acceso directo al panel nativo de Source Control (`workbench.view.scm`) para revisar diffs detallados o redactar mensajes con GitHub Copilot.
+  - Si el usuario intenta hacer commit directo sobre una rama protegida (`main`), BranchPilot advierte mediante un diálogo modal y sugiere trasladar los cambios a una rama de tarea aislada.
+- **Acoplamiento Nativo en Source Control ([`package.json`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/package.json#L54-L61) y [`src/extension.ts`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/src/extension.ts#L38)):**
+  - Se registró la vista de BranchPilot en el contenedor `"views": { "scm": [...] }`, permitiendo abrirla y organizarla dentro de la misma pestaña de Source Control junto a Cambios y Commits, además de mantener su acceso independiente en la barra de actividad.
+
 ---
 
 ## 4. Métricas de Calidad y Paquete `.vsix`
 
-- **Pruebas:** `15 passed` suites de test (`89 passed` tests unitarios, de integración y de carga con 1,001 ramas).
+- **Pruebas:** `15 passed` suites de test (**`91 passed` tests unitarios**, de integración, carga y guards).
 - **Tipado & Lint:** TypeScript `strict` y ESLint con **0 errores y 0 advertencias**.
 - **Tamaño de los bundles compilados (`npm run build`):**
-  - `dist/extension.js`: **57.6 KB** (límite en `CONSTRAINTS.md`: `< 500 KB`).
-  - `dist/webview.js`: **25.0 KB**.
-  - `dist/cli.js`: **13.9 KB**.
+  - `dist/extension.js`: **59.2 KB** (límite en `CONSTRAINTS.md`: `< 500 KB`).
+  - `dist/webview.js`: **29.7 KB**.
+  - `dist/cli.js`: **14.1 KB**.
 - **Empaquetado `.vsix` limpio de producción (`npm run package`):**
-  - Archivo generado: `/Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/branchpilot-0.1.0.vsix` (**44.76 KB**, 13 archivos de producción sin archivos de test ni configuración).
-  - Instalación en un clic desde terminal o paleta:
-    - `code --install-extension branchpilot-0.1.0.vsix`
-    - `cursor --install-extension branchpilot-0.1.0.vsix`
-    - `agy --install-extension branchpilot-0.1.0.vsix`
-
-
+  - Archivo generado: `/Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/branchpilot-0.1.0.vsix` (**51.92 KB**, 13 archivos esenciales).
+  - Instalado y validado en **Visual Studio Code** y **Antigravity IDE**.
