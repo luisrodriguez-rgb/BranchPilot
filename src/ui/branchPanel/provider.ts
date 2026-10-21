@@ -75,6 +75,9 @@ export class BranchPanelProvider implements vscode.WebviewViewProvider, vscode.D
         case 'removeWorktree':
           void this.actions.removeWorktree(message.path);
           break;
+        case 'selectRepo':
+          void this.repos.selectRepository(message.root);
+          break;
       }
     });
     view.onDidChangeVisibility(() => {
@@ -92,7 +95,13 @@ export class BranchPanelProvider implements vscode.WebviewViewProvider, vscode.D
     const repo = this.repos.state;
     if (!repo) return { kind: 'empty' };
     const settings = readSettings();
-    return { kind: 'repo', repo, protection: settings.protection, staleDays: settings.staleDays };
+    return {
+      kind: 'repo',
+      repo,
+      repositories: this.repos.repositories,
+      protection: settings.protection,
+      staleDays: settings.staleDays,
+    };
   }
 
   private async sendCommits(ref: string): Promise<void> {

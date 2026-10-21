@@ -40,6 +40,78 @@ body {
   flex: none;
 }
 
+/* ---- Dashboard Multi-repositorio ---- */
+.repos-bar {
+  flex: none;
+  padding: 6px 8px;
+  border: 1px solid var(--bp-border);
+  border-radius: var(--bp-radius);
+  background: color-mix(in srgb, var(--vscode-editor-background, transparent) 45%, transparent);
+}
+
+.repos-title {
+  margin-bottom: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bp-muted);
+}
+
+.repos-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.repo-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 3px 8px;
+  color: var(--vscode-foreground);
+  background: transparent;
+  border: 1px solid var(--bp-border);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.repo-pill:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.repo-pill.active {
+  border-color: var(--bp-green);
+  background: color-mix(in srgb, var(--bp-green) 14%, transparent);
+}
+
+.repo-pill-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repo-pill-branch {
+  color: var(--bp-muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repo-pill.dirty .repo-pill-branch {
+  color: var(--bp-orange);
+}
+
+.repo-pill-stat {
+  font-size: 10px;
+  color: var(--bp-purple);
+}
+
 /* ---- Rama actual ---- */
 .current {
   position: relative;

@@ -103,6 +103,10 @@
       {
         "command": "branchpilot.diagnoseEnvironment",
         "title": "BranchPilot: Diagnosticar compatibilidad del IDE y Git"
+      },
+      {
+        "command": "branchpilot.switchRepository",
+        "title": "BranchPilot: Cambiar de repositorio en el workspace…"
       }
     ],
     "configuration": {
@@ -140,6 +144,14 @@
           "default": 90,
           "minimum": 1,
           "description": "Días sin actividad tras los cuales una rama se considera antigua."
+        },
+        "branchpilot.scanPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Rutas absolutas de carpetas adicionales donde buscar repositorios Git para el dashboard multi-repositorio."
         }
       }
     }

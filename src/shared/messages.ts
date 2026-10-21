@@ -1,10 +1,16 @@
 import type { ProtectionConfig } from './protection';
-import type { CommitSummary, RepoState } from './types';
+import type { CommitSummary, RepoOverview, RepoState } from './types';
 
 /** Estado completo que la extensión envía al panel. */
 export type PanelState =
   | { kind: 'empty' }
-  | { kind: 'repo'; repo: RepoState; protection: ProtectionConfig; staleDays: number };
+  | {
+      kind: 'repo';
+      repo: RepoState;
+      repositories: RepoOverview[];
+      protection: ProtectionConfig;
+      staleDays: number;
+    };
 
 export type ToWebview =
   | { type: 'state'; state: PanelState }
@@ -23,11 +29,12 @@ export type FromWebview =
   | { type: 'setupAgentRules' }
   | { type: 'createWorktree'; ref?: string }
   | { type: 'openWorktree'; path: string }
-  | { type: 'removeWorktree'; path: string };
+  | { type: 'removeWorktree'; path: string }
+  | { type: 'selectRepo'; root: string };
 
 export function isFromWebview(value: unknown): value is FromWebview {
   if (typeof value !== 'object' || value === null) return false;
-  const message = value as { type?: unknown; ref?: unknown; base?: unknown; path?: unknown };
+  const message = value as { type?: unknown; ref?: unknown; base?: unknown; path?: unknown; root?: unknown };
   switch (message.type) {
     case 'ready':
     case 'refresh':
@@ -47,10 +54,13 @@ export function isFromWebview(value: unknown): value is FromWebview {
     case 'openWorktree':
     case 'removeWorktree':
       return typeof message.path === 'string' && message.path.length > 0;
+    case 'selectRepo':
+      return typeof message.root === 'string' && message.root.length > 0;
     default:
       return false;
   }
 }
+
 
 
 

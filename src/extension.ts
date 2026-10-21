@@ -11,6 +11,7 @@ import {
   REMOVE_WORKTREE_COMMAND,
   RENAME_BRANCH_COMMAND,
   SETUP_AGENT_RULES_COMMAND,
+  SWITCH_REPO_COMMAND,
   VERIFY_TASK_BRANCH_COMMAND,
 } from './branchActions';
 import { RepoService } from './repoService';
@@ -43,6 +44,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand(OPEN_WORKTREE_COMMAND, (wtPath?: string) => actions.openWorktree(wtPath)),
     vscode.commands.registerCommand(REMOVE_WORKTREE_COMMAND, (wtPath?: string) => actions.removeWorktree(wtPath)),
     vscode.commands.registerCommand(DIAGNOSE_ENV_COMMAND, () => actions.diagnoseEnvironment()),
+    vscode.commands.registerCommand(SWITCH_REPO_COMMAND, (root?: string) => actions.switchRepository(root)),
   );
 
   await repos.start();
@@ -51,6 +53,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 export function deactivate(): void {
   // los recursos se liberan mediante context.subscriptions
 }
+
 
 
 

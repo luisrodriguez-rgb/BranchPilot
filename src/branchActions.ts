@@ -21,6 +21,7 @@ export const CREATE_WORKTREE_COMMAND = 'branchpilot.createWorktree';
 export const OPEN_WORKTREE_COMMAND = 'branchpilot.openWorktree';
 export const REMOVE_WORKTREE_COMMAND = 'branchpilot.removeWorktree';
 export const DIAGNOSE_ENV_COMMAND = 'branchpilot.diagnoseEnvironment';
+export const SWITCH_REPO_COMMAND = 'branchpilot.switchRepository';
 
 function formatGitFailure(error: unknown): string {
   if (error instanceof GitError && error.stderr.trim()) {
@@ -662,6 +663,45 @@ export class BranchActions {
       { modal: true, detail },
     );
   }
+
+  /** Permite elegir cuál de los repositorios descubiertos en el workspace inspeccionar. */
+  async switchRepository(root?: string): Promise<void> {
+    if (root) {
+      await this.repos.selectRepository(root);
+      return;
+    }
+    await this.repos.refresh();
+    const list = this.repos.repositories;
+    if (list.length === 0) {
+      void vscode.window.showWarningMessage('BranchPilot: No se detectaron repositorios Git en el workspace.');
+      return;
+    }
+    const picked = await vscode.window.showQuickPick(
+      list.map((r) => {
+        const branchLabel = r.detached ? `HEAD (${r.shortHash ?? 'desacoplado'})` : (r.branch ?? 'HEAD');
+        const statusParts = [
+          `${r.localBranches} locales`,
+          r.unmergedLocalBranches > 0 ? `${r.unmergedLocalBranches} sin fusionar` : 'todo fusionado',
+          r.staleLocalBranches > 0 ? `${r.staleLocalBranches} antiguas` : undefined,
+          r.dirty ? `${r.changesCount} cambios` : 'limpio',
+        ].filter(Boolean);
+        return {
+          label: `${r.isActive ? '$(check) ' : ''}${r.name}`,
+          description: `Rama: ${branchLabel}`,
+          detail: `${statusParts.join(' · ')} — ${r.root}`,
+          root: r.root,
+        };
+      }),
+      {
+        title: 'Repositorios Git del workspace',
+        placeHolder: 'Selecciona el repositorio activo para BranchPilot',
+      },
+    );
+    if (picked) {
+      await this.repos.selectRepository(picked.root);
+    }
+  }
 }
+
 
 

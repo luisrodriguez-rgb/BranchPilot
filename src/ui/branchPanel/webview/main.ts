@@ -3,7 +3,7 @@ import type { FilterId } from '../../../shared/filter';
 import type { FromWebview, PanelState, ToWebview } from '../../../shared/messages';
 import { isListedProtected } from '../../../shared/protection';
 import { relativeTime } from '../../../shared/time';
-import type { BranchInfo, RepoState } from '../../../shared/types';
+import type { BranchInfo, RepoOverview, RepoState } from '../../../shared/types';
 import { isDirty } from '../../../shared/types';
 import { computeWindow, scrollTopToReveal } from '../../../shared/virtual';
 import { h, icon } from './dom';
@@ -74,6 +74,7 @@ let rowsEl: HTMLElement | undefined;
 let spacerEl: HTMLElement | undefined;
 let chipsEl: HTMLElement | undefined;
 let summaryEl: HTMLElement | undefined;
+let reposEl: HTMLElement | undefined;
 let headerEl: HTMLElement | undefined;
 let worktreesEl: HTMLElement | undefined;
 let footerEl: HTMLElement | undefined;
@@ -133,6 +134,7 @@ function buildShell(): void {
   refresh.append(icon(ICON_REFRESH, 'icon'));
   refresh.addEventListener('click', () => vscode.postMessage({ type: 'refresh' }));
 
+  reposEl = h('section', { class: 'repos-bar', 'aria-label': 'Repositorios del workspace', hidden: '' });
   headerEl = h('section', { class: 'current', 'aria-label': 'Rama actual' });
   worktreesEl = h('section', { class: 'worktrees', 'aria-label': 'Worktrees activos' });
   chipsEl = h('div', { class: 'chips', role: 'tablist', 'aria-label': 'Filtros de ramas' });
@@ -151,6 +153,7 @@ function buildShell(): void {
   new ResizeObserver(() => renderRows()).observe(listEl);
 
   app.append(
+    reposEl,
     headerEl,
     worktreesEl,
     h('div', { class: 'toolbar' }, searchInput, createBtn, refresh),
@@ -438,6 +441,53 @@ function renderChips(counts: Record<FilterId, number>): void {
   );
 }
 
+function renderRepos(repositories: RepoOverview[]): void {
+  if (!reposEl) return;
+  if (repositories.length <= 1) {
+    reposEl.hidden = true;
+    reposEl.replaceChildren();
+    return;
+  }
+
+  reposEl.hidden = false;
+  const list = h('div', { class: 'repos-list', role: 'tablist', 'aria-label': 'Seleccionar repositorio' });
+  for (const r of repositories) {
+    const branchLabel = r.detached ? `HEAD@${r.shortHash ?? '—'}` : (r.branch ?? 'HEAD');
+    const tooltipParts = [
+      `${r.name} (${r.root})`,
+      `Rama activa: ${branchLabel}`,
+      `${r.localBranches} ramas locales · ${r.unmergedLocalBranches} sin fusionar · ${r.staleLocalBranches} antiguas`,
+      r.dirty ? `${r.changesCount} cambios pendientes` : 'Árbol limpio',
+    ];
+    const pill = h(
+      'button',
+      {
+        class: `repo-pill${r.isActive ? ' active' : ''}${r.dirty ? ' dirty' : ''}`,
+        type: 'button',
+        role: 'tab',
+        'aria-selected': String(r.isActive),
+        title: tooltipParts.join('\n'),
+      },
+      h('span', { class: 'repo-pill-name' }, r.name),
+      h('span', { class: 'repo-pill-branch' }, `${branchLabel}${r.dirty ? '*' : ''}`),
+    );
+    if (r.unmergedLocalBranches > 0) {
+      pill.append(h('span', { class: 'repo-pill-stat', title: 'Ramas locales sin fusionar' }, `${r.unmergedLocalBranches}↗`));
+    }
+    pill.addEventListener('click', () => {
+      if (!r.isActive) {
+        card.hide();
+        vscode.postMessage({ type: 'selectRepo', root: r.root });
+      }
+    });
+    list.append(pill);
+  }
+  reposEl.replaceChildren(
+    h('div', { class: 'repos-title' }, `Repositorios (${repositories.length})`),
+    list,
+  );
+}
+
 function renderFooter(repo: RepoState): void {
   if (!footerEl) return;
   const parts: string[] = [];
@@ -447,9 +497,16 @@ function renderFooter(repo: RepoState): void {
   footerEl.textContent = parts.join(' ');
 }
 
-function currentRepo(): { repo: RepoState; staleDays: number; protectedBranches: string[] } | undefined {
+function currentRepo():
+  | { repo: RepoState; repositories: RepoOverview[]; staleDays: number; protectedBranches: string[] }
+  | undefined {
   return ui.panel.kind === 'repo'
-    ? { repo: ui.panel.repo, staleDays: ui.panel.staleDays, protectedBranches: ui.panel.protection.protectedBranches }
+    ? {
+        repo: ui.panel.repo,
+        repositories: ui.panel.repositories,
+        staleDays: ui.panel.staleDays,
+        protectedBranches: ui.panel.protection.protectedBranches,
+      }
     : undefined;
 }
 
@@ -653,6 +710,7 @@ function renderAll(resetScroll: boolean): void {
   const now = Date.now();
   const protectedNow =
     !ctx.repo.head.detached && !!ctx.repo.head.branch && isListedProtected(ctx.repo.head.branch, ctx.protectedBranches);
+  renderRepos(ctx.repositories);
   renderHeader(ctx.repo, protectedNow);
   renderWorktrees(ctx.repo);
   renderChips(countByFilter(ctx.repo.branches, now, ctx.staleDays));
