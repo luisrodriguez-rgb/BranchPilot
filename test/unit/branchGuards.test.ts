@@ -156,4 +156,36 @@ describe('evaluateGuard', () => {
       expect(unmerged.confirms.map((c) => c.id)).toEqual(['deleteUnmerged']);
     }
   });
+
+  it('bloquea checkout y deleteBranch cuando la rama está activa en otro worktree', () => {
+    const ctx = makeCtx({
+      worktrees: [
+        {
+          path: '/repo/main',
+          head: '1234567',
+          branch: 'main',
+          detached: false,
+          isMain: true,
+          isCurrent: true,
+          locked: false,
+          prunable: false,
+        },
+        {
+          path: '/repo/wt-paralelo',
+          head: 'abcdef1',
+          branch: 'feat/login',
+          detached: false,
+          isMain: false,
+          isCurrent: false,
+          locked: false,
+          prunable: false,
+        },
+      ],
+    });
+    expect(evaluateGuard({ kind: 'checkout', target: 'feat/login' }, ctx)).toMatchObject({ status: 'blocked' });
+    expect(evaluateGuard({ kind: 'deleteBranch', branch: makeBranch({ name: 'feat/login' }) }, ctx)).toMatchObject({
+      status: 'blocked',
+    });
+  });
 });
+

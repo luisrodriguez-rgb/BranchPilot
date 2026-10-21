@@ -10,6 +10,7 @@ function state(over: Partial<RepoState> = {}): RepoState {
     head: { branch: 'feat/x', detached: false, shortHash: 'abc1234' },
     baseBranch: 'main',
     branches: [],
+    worktrees: [],
     workingTree: { staged: 0, unstaged: 0, untracked: 0, conflicted: 0 },
     ...over,
   };

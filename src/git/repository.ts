@@ -1,8 +1,16 @@
 import { access, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { validateBranchName } from '../guards/branchGuards';
-import type { BranchInfo, CommitSummary, GitOperation, HeadInfo, RepoState, WorkingTreeStatus } from '../shared/types';
-import { COMMIT_LOG_FORMAT, branchFormat, parseBranches, parseCommits, parseStatus } from './parse';
+import type {
+  BranchInfo,
+  CommitSummary,
+  GitOperation,
+  HeadInfo,
+  RepoState,
+  WorkingTreeStatus,
+  WorktreeInfo,
+} from '../shared/types';
+import { COMMIT_LOG_FORMAT, branchFormat, parseBranches, parseCommits, parseStatus, parseWorktrees } from './parse';
 import type { GitRunner } from './runner';
 import { GitError, runGit, runGitWrite } from './runner';
 
@@ -215,6 +223,66 @@ export class GitRepository {
     await this.runWrite(this.root, args);
   }
 
+  /** Lista todos los worktrees registrados en el repositorio. */
+  async listWorktrees(): Promise<WorktreeInfo[]> {
+    try {
+      const out = await this.run(this.root, ['worktree', 'list', '--porcelain', '-z']);
+      const parsed = parseWorktrees(out, this.root);
+      for (const wt of parsed) {
+        wt.path = path.normalize(wt.path);
+        wt.isCurrent = wt.path === this.root;
+      }
+      return parsed;
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Crea un nuevo worktree en `targetDir`.
+   * Si `options.newBranch` se especifica, crea una rama nueva (`-b`) a partir de `options.refOrBase` (o `HEAD`).
+   * De lo contrario, acopla el worktree a la rama existente `options.refOrBase`.
+   */
+  async addWorktree(targetDir: string, options: { newBranch?: string; refOrBase?: string }): Promise<string> {
+    const resolvedDir = path.resolve(this.root, targetDir);
+    if (resolvedDir.startsWith('-')) throw new Error(`Ruta de worktree no válida: ${targetDir}`);
+
+    const args = ['worktree', 'add'];
+    if (options.newBranch) {
+      const cleanNew = options.newBranch.trim();
+      const err = validateBranchName(cleanNew);
+      if (err) throw new Error(err);
+      args.push('-b', cleanNew, resolvedDir);
+      if (options.refOrBase) {
+        const baseClean = options.refOrBase.trim();
+        if (baseClean.startsWith('-')) throw new Error(`Rama base no válida: ${baseClean}`);
+        args.push(baseClean);
+      }
+    } else if (options.refOrBase) {
+      const branchClean = options.refOrBase.trim();
+      const err = validateBranchName(branchClean);
+      if (err) throw new Error(err);
+      args.push(resolvedDir, branchClean);
+    } else {
+      throw new Error('Debes indicar una rama existente o una nueva rama para el worktree.');
+    }
+
+    await this.runWrite(this.root, args);
+    return resolvedDir;
+  }
+
+  /** Quita un worktree secundario registrado en el repositorio. */
+  async removeWorktree(targetDir: string, force = false): Promise<void> {
+    const normalized = path.normalize(path.resolve(this.root, targetDir));
+    if (normalized === this.root) {
+      throw new Error('No se puede eliminar el worktree abierto actualmente.');
+    }
+    const args = ['worktree', 'remove'];
+    if (force) args.push('--force');
+    args.push('--', normalized);
+    await this.runWrite(this.root, args);
+  }
+
   private async mergedRefs(baseBranch: string): Promise<Set<string>> {
     try {
       const out = await this.run(this.root, [
@@ -263,14 +331,15 @@ export class GitRepository {
   }
 
   async snapshot(): Promise<RepoState> {
-    const [head, baseBranch, workingTree, fetchedAt] = await Promise.all([
+    const [head, baseBranch, workingTree, fetchedAt, worktrees] = await Promise.all([
       this.head(),
       this.detectBase(),
       this.workingTree(),
       this.lastFetch(),
+      this.listWorktrees(),
     ]);
     const branches = await this.listBranches(baseBranch);
-    const state: RepoState = { root: this.root, name: this.name, head, branches, workingTree };
+    const state: RepoState = { root: this.root, name: this.name, head, branches, worktrees, workingTree };
     if (baseBranch) state.baseBranch = baseBranch;
     if (fetchedAt !== undefined) state.fetchedAt = fetchedAt;
     return state;

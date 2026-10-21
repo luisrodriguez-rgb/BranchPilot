@@ -1,4 +1,4 @@
-import type { BranchInfo, CommitSummary, WorkingTreeStatus } from '../shared/types';
+import type { BranchInfo, CommitSummary, WorkingTreeStatus, WorktreeInfo } from '../shared/types';
 
 const SEP = '\x1f';
 const LOCAL_PREFIX = 'refs/heads/';
@@ -117,3 +117,57 @@ export function parseStatus(output: string): Omit<WorkingTreeStatus, 'operation'
   }
   return result;
 }
+
+/**
+ * Interpreta la salida de `git worktree list --porcelain -z`.
+ * Cada bloque de worktree está separado por un registro vacío (`\0\0`).
+ */
+export function parseWorktrees(output: string, currentRoot: string): WorktreeInfo[] {
+  const tokens = output.split('\0');
+  const worktrees: WorktreeInfo[] = [];
+  let current: WorktreeInfo | undefined;
+
+  const flush = (): void => {
+    if (current && current.path) {
+      worktrees.push(current);
+    }
+    current = undefined;
+  };
+
+  for (const token of tokens) {
+    if (!token) {
+      flush();
+      continue;
+    }
+    if (token.startsWith('worktree ')) {
+      flush();
+      const wtPath = token.slice('worktree '.length);
+      current = {
+        path: wtPath,
+        head: '',
+        detached: false,
+        isMain: worktrees.length === 0,
+        isCurrent: wtPath === currentRoot,
+        locked: false,
+        prunable: false,
+      };
+      continue;
+    }
+    if (!current) continue;
+    if (token.startsWith('HEAD ')) {
+      current.head = token.slice('HEAD '.length, 'HEAD '.length + 7);
+    } else if (token.startsWith('branch ')) {
+      const ref = token.slice('branch '.length);
+      current.branch = ref.startsWith(LOCAL_PREFIX) ? ref.slice(LOCAL_PREFIX.length) : ref;
+    } else if (token === 'detached') {
+      current.detached = true;
+    } else if (token === 'locked' || token.startsWith('locked ')) {
+      current.locked = true;
+    } else if (token === 'prunable' || token.startsWith('prunable ')) {
+      current.prunable = true;
+    }
+  }
+  flush();
+  return worktrees;
+}
+

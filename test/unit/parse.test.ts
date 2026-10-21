@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseBranchLine, parseBranches, parseCommits, parseStatus } from '../../src/git/parse';
+import { parseBranchLine, parseBranches, parseCommits, parseStatus, parseWorktrees } from '../../src/git/parse';
 
 const SEP = '\x1f';
 const line = (...f: string[]): string => f.join(SEP);
@@ -72,3 +72,58 @@ describe('parseStatus', () => {
     expect(parseStatus('')).toEqual({ staged: 0, unstaged: 0, untracked: 0, conflicted: 0 });
   });
 });
+
+describe('parseWorktrees', () => {
+  it('interpreta múltiples worktrees con ramas, detached y bloqueos', () => {
+    const raw =
+      [
+        'worktree /repo/main',
+        'HEAD 1234567890abcdef',
+        'branch refs/heads/main',
+        '',
+        'worktree /repo/wt-feat',
+        'HEAD abcdef1234567890',
+        'branch refs/heads/feat/agent-2',
+        'locked por agente',
+        '',
+        'worktree /repo/wt-detached',
+        'HEAD fedcba0987654321',
+        'detached',
+        '',
+      ].join('\0') + '\0';
+
+    const list = parseWorktrees(raw, '/repo/main');
+    expect(list).toEqual([
+      {
+        path: '/repo/main',
+        head: '1234567',
+        branch: 'main',
+        detached: false,
+        isMain: true,
+        isCurrent: true,
+        locked: false,
+        prunable: false,
+      },
+      {
+        path: '/repo/wt-feat',
+        head: 'abcdef1',
+        branch: 'feat/agent-2',
+        detached: false,
+        isMain: false,
+        isCurrent: false,
+        locked: true,
+        prunable: false,
+      },
+      {
+        path: '/repo/wt-detached',
+        head: 'fedcba0',
+        detached: true,
+        isMain: false,
+        isCurrent: false,
+        locked: false,
+        prunable: false,
+      },
+    ]);
+  });
+});
+

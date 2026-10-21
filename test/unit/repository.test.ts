@@ -153,6 +153,26 @@ describe('GitRepository', () => {
     expect((await r.workingTree()).untracked).toBe(0);
   });
 
+  it('crea, lista y elimina un worktree paralelo sin alterar la rama principal', async () => {
+    const r = await open();
+    const wtDir = `${repo.dir}-wt-paralelo`;
+    try {
+      const created = await r.addWorktree(wtDir, { newBranch: 'feat/paralelo', refOrBase: 'main' });
+      expect(created).toBe(wtDir);
+      expect((await r.head()).branch).toBe('main');
+
+      const wts = await r.listWorktrees();
+      expect(wts.length).toBe(2);
+      expect(wts.find((w) => w.isCurrent)?.branch).toBe('main');
+      expect(wts.find((w) => !w.isCurrent)?.branch).toBe('feat/paralelo');
+
+      await r.removeWorktree(wtDir);
+      expect((await r.listWorktrees()).length).toBe(1);
+    } finally {
+      repo.git('worktree', 'prune');
+    }
+  });
+
   it('lee 200 ramas rápidamente', async () => {
     const headRef = repo.git('rev-parse', 'HEAD').trim();
     const dir = path.join(repo.dir, '.git', 'refs', 'heads', 'bulk');

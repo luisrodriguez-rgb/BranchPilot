@@ -1,6 +1,6 @@
 import type { ProtectionConfig } from '../shared/protection';
 import { requiresConfirmation } from '../shared/protection';
-import type { BranchInfo, GitOperation, HeadInfo, WorkingTreeStatus } from '../shared/types';
+import type { BranchInfo, GitOperation, HeadInfo, WorkingTreeStatus, WorktreeInfo } from '../shared/types';
 import { isDirty } from '../shared/types';
 
 export type GuardAction =
@@ -14,6 +14,7 @@ export interface GuardContext {
   workingTree: WorkingTreeStatus;
   protection: ProtectionConfig;
   baseBranch?: string;
+  worktrees?: WorktreeInfo[];
 }
 
 export type DirtyResolution = 'proceed' | 'stash' | 'cancel';
@@ -85,7 +86,17 @@ function blockingReason(wt: WorkingTreeStatus): string | undefined {
  * bloquearse o qué confirmaciones requiere antes de tocar el repositorio.
  */
 export function evaluateGuard(action: GuardAction, ctx: GuardContext): GuardDecision {
-  const { head, workingTree: wt, protection, baseBranch } = ctx;
+  const { head, workingTree: wt, protection, baseBranch, worktrees = [] } = ctx;
+
+  if (action.kind === 'checkout') {
+    const busyWt = worktrees.find((w) => !w.isCurrent && w.branch === action.target);
+    if (busyWt) {
+      return {
+        status: 'blocked',
+        reason: `La rama «${action.target}» ya está activa en otro worktree (${busyWt.path}). Ábrelo en otra ventana en lugar de cambiar aquí.`,
+      };
+    }
+  }
 
   if (action.kind === 'createBranch') {
     const nameError = validateBranchName(action.name);
@@ -109,6 +120,13 @@ export function evaluateGuard(action: GuardAction, ctx: GuardContext): GuardDeci
     }
     if (baseBranch && action.branch.name === baseBranch) {
       return { status: 'blocked', reason: `No se puede eliminar la rama base del repositorio («${baseBranch}»).` };
+    }
+    const busyWt = worktrees.find((w) => !w.isCurrent && w.branch === action.branch.name);
+    if (busyWt) {
+      return {
+        status: 'blocked',
+        reason: `No se puede eliminar «${action.branch.name}» porque está en uso en el worktree «${busyWt.path}». Quita primero ese worktree.`,
+      };
     }
   }
 

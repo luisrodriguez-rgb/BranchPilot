@@ -40,12 +40,29 @@ export interface WorkingTreeStatus {
   operation?: GitOperation;
 }
 
+export interface WorktreeInfo {
+  /** Ruta absoluta del árbol de trabajo en disco. */
+  path: string;
+  /** Hash completo o corto del HEAD de ese worktree. */
+  head: string;
+  /** Nombre corto de la rama (`feat/x`), si no está desacoplado. */
+  branch?: string;
+  detached: boolean;
+  /** Si es el árbol de trabajo principal del repositorio. */
+  isMain: boolean;
+  /** Si corresponde al árbol de trabajo abierto en esta ventana. */
+  isCurrent: boolean;
+  locked: boolean;
+  prunable: boolean;
+}
+
 export interface RepoState {
   root: string;
   name: string;
   head: HeadInfo;
   baseBranch?: string;
   branches: BranchInfo[];
+  worktrees: WorktreeInfo[];
   workingTree: WorkingTreeStatus;
   /** Milisegundos desde epoch del último fetch conocido. */
   fetchedAt?: number;
@@ -54,3 +71,4 @@ export interface RepoState {
 export function isDirty(status: WorkingTreeStatus): boolean {
   return status.staged + status.unstaged + status.untracked + status.conflicted > 0;
 }
+

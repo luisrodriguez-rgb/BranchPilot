@@ -97,6 +97,18 @@ export class RepoService implements vscode.Disposable {
     await this.refresh();
   }
 
+  async addWorktree(targetDir: string, options: { newBranch?: string; refOrBase?: string }): Promise<string> {
+    const dir = await this.requireRepo().addWorktree(targetDir, options);
+    await this.refresh();
+    return dir;
+  }
+
+  async removeWorktree(targetDir: string, force = false): Promise<void> {
+    await this.requireRepo().removeWorktree(targetDir, force);
+    await this.refresh();
+  }
+
+
   /** Refresca el estado; las llamadas simultáneas se agrupan en una sola ejecución extra. */
   refresh(): Promise<void> {
     if (this.inFlight) {
