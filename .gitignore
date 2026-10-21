@@ -1,0 +1,7 @@
+node_modules/
+dist/
+coverage/
+.tmp-test/
+*.vsix
+.vscode-test/
+.DS_Store

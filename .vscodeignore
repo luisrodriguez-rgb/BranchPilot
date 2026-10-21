@@ -1,0 +1,15 @@
+.vscode/**
+.github/**
+src/**
+test/**
+tasks/**
+node_modules/**
+coverage/**
+.tmp-test/**
+**/*.map
+esbuild.mjs
+eslint.config.mjs
+vitest.config.ts
+tsconfig.json
+SPEC.md
+CONSTRAINTS.md

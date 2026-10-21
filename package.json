@@ -1,0 +1,119 @@
+{
+  "name": "branchpilot",
+  "displayName": "BranchPilot",
+  "description": "Control visual de ramas de Git para el desarrollo asistido por IA: sabe siempre en qué rama estás.",
+  "version": "0.1.0",
+  "publisher": "luisrodriguez-rgb",
+  "license": "MIT",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/luisrodriguez-rgb/BranchPilot.git"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "SCM Providers",
+    "Visualization",
+    "Other"
+  ],
+  "keywords": [
+    "git",
+    "branch",
+    "ai",
+    "agents",
+    "worktree"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "branchpilot",
+          "title": "BranchPilot",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "branchpilot": [
+        {
+          "type": "webview",
+          "id": "branchpilot.panel",
+          "name": "Ramas"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "branchpilot.refresh",
+        "title": "BranchPilot: Actualizar ramas"
+      },
+      {
+        "command": "branchpilot.focusPanel",
+        "title": "BranchPilot: Mostrar panel de ramas"
+      }
+    ],
+    "configuration": {
+      "title": "BranchPilot",
+      "properties": {
+        "branchpilot.protection.mode": {
+          "type": "string",
+          "enum": [
+            "all",
+            "list",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Pide confirmación antes de operar en cualquier rama.",
+            "Pide confirmación solo en las ramas de la lista protectedBranches.",
+            "No pide confirmación."
+          ],
+          "default": "all",
+          "description": "Cuándo pedir confirmación antes de operaciones que modifican código o pueden perder trabajo."
+        },
+        "branchpilot.protection.protectedBranches": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "main",
+            "master",
+            "develop"
+          ],
+          "description": "Ramas resaltadas como protegidas (patrones con * permitidos, p. ej. release/*)."
+        },
+        "branchpilot.staleDays": {
+          "type": "number",
+          "default": 90,
+          "minimum": 1,
+          "description": "Días sin actividad tras los cuales una rama se considera antigua."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "package": "npm run build && vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.6.5",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^4.0.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.13.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.0",
+    "vitest": "^5.0.5"
+  }
+}
