@@ -129,20 +129,38 @@ flowchart LR
   - Incluye el filtro rápido **«Filtrar activos (M/N)» / «Con actividad (M)»** en el encabezado del Radar para mostrar únicamente los repositorios que tienen cambios sin guardar (`dirty`), ramas locales sin fusionar en `main` (`unmergedLocalBranches > 0`) o worktrees secundarios abiertos (`worktreesCount > 1`).
   - Cada tarjeta de repositorio cuenta con dos acciones directas: clic en el nombre/rama para inspeccionarlo en el panel actual y clic en el icono de ventana (`Abrir en nueva ventana`) o mediante el comando `branchpilot.openRepositoryInWindow` (**«BranchPilot: Abrir repositorio en nueva ventana…»**).
 
+### Fase 11 · Red de Seguridad (`Undo` + `Reflog`), Monorepos `pnpm`, `i18n` (`es`/`en`) y Rendimiento a Escala
+
+- **Pila de deshacer en memoria + respaldo en `git reflog` ([`src/git/undoStack.ts`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/src/git/undoStack.ts)):**
+  - Antes de ejecutar `deleteBranch`, `renameBranch` o `checkout`, [`BranchActions`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/src/branchActions.ts#L128-L320) registra una entrada inmutable en [`UndoStack`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/src/git/undoStack.ts#L53-L88) (incluyendo el SHA completo de 40 caracteres al eliminar una rama local).
+  - Al eliminar cualquier rama local, el toast de confirmación ofrece el botón **«Deshacer»**, que ejecuta [`restoreBranch`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/src/git/repository.ts#L232-L244) (`git branch <nombre> <sha>`) al instante.
+  - Si la pila en memoria está vacía (p. ej. tras recargar la ventana), el comando `branchpilot.undoLastBranchAction` (disponible en la paleta y en el botón `Deshacer` de la barra de herramientas del panel) consulta [`recentReflog`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/src/git/repository.ts#L247-L260) para recuperar cualquier estado reciente.
+- **Detección inteligente de gestores de paquetes y monorepos `pnpm` ([`detectPackageManager`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/src/git/worktreeBootstrap.ts#L57-L103)):**
+  - Detecta `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `bun.lockb` / `bun.lock`, `yarn.lock` y `package-lock.json`.
+  - Si detecta un monorepo `pnpm-workspace.yaml`, evita crear un único symlink raíz de `node_modules` que dejaría paquetes internos rotos y ofrece ejecutar `pnpm install --prefer-offline` en segundo plano con [`runPackageInstall`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/src/git/worktreeBootstrap.ts#L106-L126).
+- **Internacionalización completa (`es` / `en`):**
+  - [package.nls.json](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/package.nls.json) (inglés base para alcance global en Open VSX / Marketplace) y [package.nls.es.json](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/package.nls.es.json) (español) localizan todos los comandos, vistas y propiedades de configuración.
+  - [`src/shared/i18n.ts`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/src/shared/i18n.ts) adapta dinámicamente los textos del panel Webview según `vscode.env.language`.
+- **Prueba de carga con 1,001 ramas ([`test/unit/largeRepoPerf.test.ts`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/test/unit/largeRepoPerf.test.ts)):**
+  - Crea 1,000 ramas en una sola transacción (`git update-ref --stdin`) y verifica que `snapshot()` + filtrado + ordenación + ventana virtualizada respondan dentro del presupuesto de latencia.
+- **Higiene de `.vsix` e icono para Marketplace (`128x128`):**
+  - Generado [media/icon.png](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/media/icon.png) (`128x128` RGBA) y depurado [.vscodeignore](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/.vscodeignore) para excluir todos los archivos de desarrollo y pruebas.
+
 ---
 
 ## 4. Métricas de Calidad y Paquete `.vsix`
 
-- **Pruebas:** `12 passed` suites de test (`82 passed` tests unitarios e integración sobre repositorios Git reales).
+- **Pruebas:** `15 passed` suites de test (`89 passed` tests unitarios, de integración y de carga con 1,001 ramas).
 - **Tipado & Lint:** TypeScript `strict` y ESLint con **0 errores y 0 advertencias**.
 - **Tamaño de los bundles compilados (`npm run build`):**
-  - `dist/extension.js`: **52.2 KB** (límite en `CONSTRAINTS.md`: `< 500 KB`).
-  - `dist/webview.js`: **22.4 KB**.
-  - `dist/cli.js`: **12.9 KB**.
-- **Empaquetado `.vsix` listo para Dogfooding (`npm run package`):**
-  - Archivo generado: `/Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/branchpilot-0.1.0.vsix` (**44.86 KB**).
+  - `dist/extension.js`: **57.6 KB** (límite en `CONSTRAINTS.md`: `< 500 KB`).
+  - `dist/webview.js`: **25.0 KB**.
+  - `dist/cli.js`: **13.9 KB**.
+- **Empaquetado `.vsix` limpio de producción (`npm run package`):**
+  - Archivo generado: `/Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/branchpilot-0.1.0.vsix` (**44.76 KB**, 13 archivos de producción sin archivos de test ni configuración).
   - Instalación en un clic desde terminal o paleta:
     - `code --install-extension branchpilot-0.1.0.vsix`
     - `cursor --install-extension branchpilot-0.1.0.vsix`
     - `agy --install-extension branchpilot-0.1.0.vsix`
+
 
