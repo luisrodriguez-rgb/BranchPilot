@@ -13,6 +13,8 @@ import type {
 import { COMMIT_LOG_FORMAT, branchFormat, parseBranches, parseCommits, parseStatus, parseWorktrees } from './parse';
 import type { GitRunner } from './runner';
 import { GitError, runGit, runGitWrite } from './runner';
+import { parseReflog } from './undoStack';
+import type { ReflogEntry } from './undoStack';
 
 const BASE_CANDIDATES = ['main', 'master', 'develop', 'trunk'];
 
@@ -208,12 +210,53 @@ export class GitRepository {
     await this.runWrite(this.root, ['branch', '-m', from, to]);
   }
 
-  /** Elimina una rama local (`-d` por defecto, `-D` si `force` es `true`). */
-  async deleteBranch(name: string, force = false): Promise<void> {
+  /** Devuelve el hash SHA completo al que apunta `ref`. */
+  async resolveRefSha(ref: string): Promise<string> {
+    const clean = ref.trim();
+    if (!clean || clean.startsWith('-')) throw new Error(`Referencia no válida: ${ref}`);
+    const out = await this.run(this.root, ['rev-parse', '--verify', `${clean}^{commit}`]);
+    return out.trim();
+  }
+
+  /** Elimina una rama local (`-d` por defecto, `-D` si `force` es `true`) y devuelve el SHA donde apuntaba. */
+  async deleteBranch(name: string, force = false): Promise<string> {
     const clean = name.trim();
     const err = validateBranchName(clean);
     if (err) throw new Error(err);
+    const sha = await this.resolveRefSha(`refs/heads/${clean}`);
     await this.runWrite(this.root, ['branch', force ? '-D' : '-d', '--', clean]);
+    return sha;
+  }
+
+  /** Restaura una rama local en un commit específico (p. ej. al deshacer una eliminación). */
+  async restoreBranch(name: string, targetSha: string): Promise<void> {
+    const clean = name.trim();
+    const err = validateBranchName(clean);
+    if (err) throw new Error(err);
+    const sha = targetSha.trim();
+    if (!/^[0-9a-f]{7,40}$/i.test(sha)) {
+      throw new Error(`SHA de commit no válido: ${targetSha}`);
+    }
+    if (await this.localBranchExists(clean)) {
+      throw new Error(`Ya existe una rama local llamada «${clean}».`);
+    }
+    await this.runWrite(this.root, ['branch', '--', clean, sha]);
+  }
+
+  /** Consulta las últimas entradas del reflog de HEAD. */
+  async recentReflog(limit = 10): Promise<ReflogEntry[]> {
+    try {
+      const out = await this.run(this.root, [
+        'reflog',
+        'show',
+        'HEAD',
+        `-n${limit}`,
+        '--format=%H%x00%gD%x00%gs%x00',
+      ]);
+      return parseReflog(out);
+    } catch {
+      return [];
+    }
   }
 
   /** Guarda los cambios actuales (incluyendo archivos sin seguimiento) en el stash. */

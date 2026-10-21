@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { GitRepository } from './git/repository';
+import type { ReflogEntry } from './git/undoStack';
 import { watchGitDir } from './git/watcher';
 import type { Disposable } from './git/watcher';
 import { readSettings } from './settings';
@@ -126,9 +127,19 @@ export class RepoService implements vscode.Disposable {
     await this.refresh();
   }
 
-  async deleteBranch(name: string, force = false): Promise<void> {
-    await this.requireRepo().deleteBranch(name, force);
+  async deleteBranch(name: string, force = false): Promise<string> {
+    const sha = await this.requireRepo().deleteBranch(name, force);
     await this.refresh();
+    return sha;
+  }
+
+  async restoreBranch(name: string, targetSha: string): Promise<void> {
+    await this.requireRepo().restoreBranch(name, targetSha);
+    await this.refresh();
+  }
+
+  async recentReflog(limit = 10): Promise<ReflogEntry[]> {
+    return this.requireRepo().recentReflog(limit);
   }
 
   async stashPush(message?: string): Promise<void> {
