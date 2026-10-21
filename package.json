@@ -4,6 +4,7 @@
   "description": "%branchpilot.description%",
   "version": "0.1.0",
   "publisher": "luisrodriguez-rgb",
+  "icon": "media/icon.png",
   "license": "MIT",
   "private": true,
   "repository": {

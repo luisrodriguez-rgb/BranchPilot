@@ -7,9 +7,12 @@ node_modules/**
 coverage/**
 .tmp-test/**
 **/*.map
+.gitignore
 esbuild.mjs
 eslint.config.mjs
 vitest.config.ts
+vitest.config.mts
 tsconfig.json
 SPEC.md
 CONSTRAINTS.md
+walkthrough.md
