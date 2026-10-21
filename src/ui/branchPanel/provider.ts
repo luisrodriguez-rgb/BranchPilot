@@ -9,8 +9,9 @@ import { randomBytes } from 'node:crypto';
 
 export class BranchPanelProvider implements vscode.WebviewViewProvider, vscode.Disposable {
   static readonly viewType = 'branchpilot.panel';
+  static readonly scmViewType = 'branchpilot.scmPanel';
 
-  private view: vscode.WebviewView | undefined;
+  private readonly views = new Set<vscode.WebviewView>();
   private readonly subscriptions: vscode.Disposable[] = [];
 
   constructor(
@@ -27,7 +28,7 @@ export class BranchPanelProvider implements vscode.WebviewViewProvider, vscode.D
   }
 
   resolveWebviewView(view: vscode.WebviewView): void {
-    this.view = view;
+    this.views.add(view);
     view.webview.options = {
       enableScripts: true,
       localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'dist'), vscode.Uri.joinPath(this.extensionUri, 'media')],
@@ -88,6 +89,12 @@ export class BranchPanelProvider implements vscode.WebviewViewProvider, vscode.D
         case 'openRepoInWindow':
           void this.actions.openRepositoryInWindow(message.root);
           break;
+        case 'openScm':
+          this.actions.openSourceControl();
+          break;
+        case 'quickCommit':
+          void this.actions.quickCommit(message.message);
+          break;
       }
     });
     view.onDidChangeVisibility(() => {
@@ -97,7 +104,7 @@ export class BranchPanelProvider implements vscode.WebviewViewProvider, vscode.D
       }
     });
     view.onDidDispose(() => {
-      if (this.view === view) this.view = undefined;
+      this.views.delete(view);
     });
   }
 
@@ -125,13 +132,17 @@ export class BranchPanelProvider implements vscode.WebviewViewProvider, vscode.D
     } catch (error) {
       message = { type: 'commits', ref, commits: [], error: error instanceof Error ? error.message : String(error) };
     }
-    void this.view?.webview.postMessage(message);
+    for (const view of this.views) {
+      void view.webview.postMessage(message);
+    }
   }
 
   private push(): void {
-    if (!this.view) return;
+    if (this.views.size === 0) return;
     const message: ToWebview = { type: 'state', state: this.currentState() };
-    void this.view.webview.postMessage(message);
+    for (const view of this.views) {
+      void view.webview.postMessage(message);
+    }
   }
 
   private html(webview: vscode.Webview): string {

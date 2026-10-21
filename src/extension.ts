@@ -35,6 +35,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     autoGuard,
     panel,
     vscode.window.registerWebviewViewProvider(BranchPanelProvider.viewType, panel),
+    vscode.window.registerWebviewViewProvider(BranchPanelProvider.scmViewType, panel),
     vscode.commands.registerCommand('branchpilot.refresh', () => repos.refresh()),
     vscode.commands.registerCommand(FOCUS_PANEL_COMMAND, () =>
       vscode.commands.executeCommand('workbench.view.extension.branchpilot'),

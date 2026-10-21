@@ -50,6 +50,13 @@
           "id": "branchpilot.panel",
           "name": "%branchpilot.view.branches%"
         }
+      ],
+      "scm": [
+        {
+          "type": "webview",
+          "id": "branchpilot.scmPanel",
+          "name": "BranchPilot"
+        }
       ]
     },
     "commands": [

@@ -10,6 +10,7 @@ import type { ConfirmPrompt, DirtyPrompt, DirtyResolution, GuardAction, GuardCon
 import type { RepoService } from './repoService';
 import { readSettings } from './settings';
 import { buildCompatibilityReport, probeGitVersion } from './shared/ideCompatibility';
+import { isListedProtected } from './shared/protection';
 import type { BranchInfo, RepoState } from './shared/types';
 
 export const CHECKOUT_COMMAND = 'branchpilot.checkout';
@@ -904,6 +905,49 @@ export class BranchActions {
     }
 
     await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(targetRoot), true);
+  }
+
+  openSourceControl(): void {
+    void vscode.commands.executeCommand('workbench.view.scm');
+  }
+
+  async quickCommit(message: string): Promise<void> {
+    const state = this.requireState();
+    if (!state) return;
+    const cleanMsg = message.trim();
+    if (!cleanMsg) {
+      void vscode.window.showWarningMessage('BranchPilot: El mensaje de commit no puede estar vacío.');
+      return;
+    }
+    if (!state.head.detached && state.head.branch) {
+      const branchName = state.head.branch;
+      const settings = readSettings();
+      if (isListedProtected(branchName, settings.protection.protectedBranches)) {
+        const choice = await vscode.window.showWarningMessage(
+          `BranchPilot: Estás a punto de hacer un commit directamente en la rama protegida «${branchName}».`,
+          {
+            modal: true,
+            detail: 'Para mantener la estabilidad del proyecto, se recomienda trasladar los cambios a una rama de tarea aislada.',
+          },
+          'Mover a rama de tarea',
+          `Hacer commit en ${branchName}`,
+        );
+        if (choice === 'Mover a rama de tarea') {
+          await this.moveDirtyToTaskBranch();
+          return;
+        }
+        if (choice !== `Hacer commit en ${branchName}`) {
+          return;
+        }
+      }
+    }
+    try {
+      const sha = await this.repos.quickCommit(cleanMsg);
+      const shortSha = sha.slice(0, 7);
+      void vscode.window.showInformationMessage(`BranchPilot: Commit ${shortSha} creado con éxito.`);
+    } catch (err) {
+      void vscode.window.showErrorMessage(`BranchPilot: No se pudo crear el commit — ${formatGitFailure(err)}`);
+    }
   }
 }
 
