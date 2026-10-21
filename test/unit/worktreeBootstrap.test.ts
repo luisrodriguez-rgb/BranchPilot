@@ -1,7 +1,7 @@
-import { lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { bootstrapWorktree, isSafeRelativePath } from '../../src/git/worktreeBootstrap';
+import { bootstrapWorktree, detectPackageManager, isSafeRelativePath } from '../../src/git/worktreeBootstrap';
 import { createTempRepo } from '../helpers/tempRepo';
 
 describe('isSafeRelativePath', () => {
@@ -14,7 +14,7 @@ describe('isSafeRelativePath', () => {
   });
 });
 
-describe('bootstrapWorktree', () => {
+describe('bootstrapWorktree & detectPackageManager', () => {
   it('copia archivos .env existentes y enlaza node_modules al nuevo worktree', async () => {
     const repo = createTempRepo();
     const targetDir = `${repo.dir}-wt-boot`;
@@ -22,6 +22,7 @@ describe('bootstrapWorktree', () => {
 
     try {
       writeFileSync(path.join(repo.dir, '.env'), 'API_KEY=123\n');
+      writeFileSync(path.join(repo.dir, 'package-lock.json'), '{}');
       mkdirSync(path.join(repo.dir, 'node_modules', 'pkg'), { recursive: true });
       writeFileSync(path.join(repo.dir, 'node_modules', 'pkg', 'index.js'), 'module.exports = 1;\n');
 
@@ -32,9 +33,40 @@ describe('bootstrapWorktree', () => {
 
       expect(res.copiedFiles).toEqual(['.env']);
       expect(res.linkedNodeModules).toBe(true);
+      expect(res.skippedSymlinkForMonorepo).toBe(false);
+      expect(res.packageManager.manager).toBe('npm');
       expect(res.warnings.length).toBe(1);
       expect(readFileSync(path.join(targetDir, '.env'), 'utf8')).toBe('API_KEY=123\n');
       expect(lstatSync(path.join(targetDir, 'node_modules')).isSymbolicLink()).toBe(true);
+    } finally {
+      repo.cleanup();
+      rmSync(targetDir, { recursive: true, force: true });
+    }
+  });
+
+  it('detecta monorepo pnpm-workspace.yaml y evita crear symlink único roto de node_modules', async () => {
+    const repo = createTempRepo();
+    const targetDir = `${repo.dir}-wt-pnpm`;
+    mkdirSync(targetDir, { recursive: true });
+
+    try {
+      writeFileSync(path.join(repo.dir, 'pnpm-workspace.yaml'), 'packages:\n  - "packages/*"\n');
+      writeFileSync(path.join(repo.dir, 'pnpm-lock.yaml'), 'lockfileVersion: 9.0\n');
+      mkdirSync(path.join(repo.dir, 'node_modules'), { recursive: true });
+
+      const pm = await detectPackageManager(repo.dir);
+      expect(pm.manager).toBe('pnpm');
+      expect(pm.isPnpmWorkspace).toBe(true);
+      expect(pm.installCommand?.display).toBe('pnpm install --prefer-offline');
+
+      const res = await bootstrapWorktree(repo.dir, targetDir, {
+        copyFiles: [],
+        linkNodeModules: true,
+      });
+
+      expect(res.linkedNodeModules).toBe(false);
+      expect(res.skippedSymlinkForMonorepo).toBe(true);
+      expect(existsSync(path.join(targetDir, 'node_modules'))).toBe(false);
     } finally {
       repo.cleanup();
       rmSync(targetDir, { recursive: true, force: true });
