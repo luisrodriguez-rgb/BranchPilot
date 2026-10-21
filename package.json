@@ -72,6 +72,18 @@
       {
         "command": "branchpilot.deleteBranch",
         "title": "BranchPilot: Eliminar rama local…"
+      },
+      {
+        "command": "branchpilot.createTaskBranch",
+        "title": "BranchPilot: Crear rama para esta tarea (IA)…"
+      },
+      {
+        "command": "branchpilot.verifyBranchForTask",
+        "title": "BranchPilot: Verificar rama antes de delegar al agente"
+      },
+      {
+        "command": "branchpilot.setupAgentRules",
+        "title": "BranchPilot: Configurar reglas para agentes de IA (AGENTS.md)…"
       }
     ],
     "configuration": {

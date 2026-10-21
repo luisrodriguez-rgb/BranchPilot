@@ -57,6 +57,15 @@ export class BranchPanelProvider implements vscode.WebviewViewProvider, vscode.D
         case 'deleteBranch':
           void this.actions.deleteBranch(message.ref);
           break;
+        case 'createTaskBranch':
+          void this.actions.createTaskBranch();
+          break;
+        case 'verifyBranchForTask':
+          void this.actions.verifyBranchForTask();
+          break;
+        case 'setupAgentRules':
+          void this.actions.setupAgentRules();
+          break;
       }
     });
     view.onDidChangeVisibility(() => {

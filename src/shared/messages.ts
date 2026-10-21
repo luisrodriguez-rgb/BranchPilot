@@ -17,7 +17,10 @@ export type FromWebview =
   | { type: 'checkout'; ref: string }
   | { type: 'createBranch'; base?: string }
   | { type: 'renameBranch'; ref: string }
-  | { type: 'deleteBranch'; ref: string };
+  | { type: 'deleteBranch'; ref: string }
+  | { type: 'createTaskBranch' }
+  | { type: 'verifyBranchForTask' }
+  | { type: 'setupAgentRules' };
 
 export function isFromWebview(value: unknown): value is FromWebview {
   if (typeof value !== 'object' || value === null) return false;
@@ -25,6 +28,9 @@ export function isFromWebview(value: unknown): value is FromWebview {
   switch (message.type) {
     case 'ready':
     case 'refresh':
+    case 'createTaskBranch':
+    case 'verifyBranchForTask':
+    case 'setupAgentRules':
       return true;
     case 'requestCommits':
     case 'checkout':
@@ -37,4 +43,5 @@ export function isFromWebview(value: unknown): value is FromWebview {
       return false;
   }
 }
+
 

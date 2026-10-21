@@ -165,6 +165,44 @@ body {
   color: var(--bp-orange);
 }
 
+.task-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.task-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  color: var(--vscode-foreground);
+  background: color-mix(in srgb, var(--vscode-button-secondaryBackground, transparent) 65%, transparent);
+  border: 1px solid var(--bp-border);
+  border-radius: 5px;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.task-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.task-btn.primary {
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+  border-color: transparent;
+  font-weight: 500;
+}
+
+.task-btn.primary:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+
 /* ---- Buscador y filtros ---- */
 .toolbar {
   display: flex;

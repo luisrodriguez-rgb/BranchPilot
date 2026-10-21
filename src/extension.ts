@@ -3,8 +3,11 @@ import {
   BranchActions,
   CHECKOUT_COMMAND,
   CREATE_BRANCH_COMMAND,
+  CREATE_TASK_BRANCH_COMMAND,
   DELETE_BRANCH_COMMAND,
   RENAME_BRANCH_COMMAND,
+  SETUP_AGENT_RULES_COMMAND,
+  VERIFY_TASK_BRANCH_COMMAND,
 } from './branchActions';
 import { RepoService } from './repoService';
 import { BranchPanelProvider } from './ui/branchPanel/provider';
@@ -29,6 +32,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand(CREATE_BRANCH_COMMAND, (base?: string) => actions.createBranch(base)),
     vscode.commands.registerCommand(RENAME_BRANCH_COMMAND, (ref?: string) => actions.renameBranch(ref)),
     vscode.commands.registerCommand(DELETE_BRANCH_COMMAND, (ref?: string) => actions.deleteBranch(ref)),
+    vscode.commands.registerCommand(CREATE_TASK_BRANCH_COMMAND, () => actions.createTaskBranch()),
+    vscode.commands.registerCommand(VERIFY_TASK_BRANCH_COMMAND, () => actions.verifyBranchForTask()),
+    vscode.commands.registerCommand(SETUP_AGENT_RULES_COMMAND, () => actions.setupAgentRules()),
   );
 
   await repos.start();
@@ -37,4 +43,5 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 export function deactivate(): void {
   // los recursos se liberan mediante context.subscriptions
 }
+
 

@@ -283,6 +283,52 @@ function renderHeader(repo: RepoState, protectedNow: boolean): void {
   }
 
   headerEl.className = `current${protectedNow || head.detached ? ' alert' : ''}`;
+  const taskBar = h('div', { class: 'task-actions' });
+  const taskBtn = h(
+    'button',
+    {
+      class: 'task-btn primary',
+      type: 'button',
+      title: 'Crear una rama nueva con nombre sugerido para tu próxima tarea con IA',
+    },
+    icon(ICON_PLUS, 'icon'),
+    h('span', {}, 'Rama para tarea'),
+  );
+  taskBtn.addEventListener('click', () => {
+    card.hide();
+    vscode.postMessage({ type: 'createTaskBranch' });
+  });
+
+  const precheckBtn = h(
+    'button',
+    {
+      class: 'task-btn',
+      type: 'button',
+      title: 'Verificar si la rama actual es segura antes de delegar trabajo a un agente',
+    },
+    h('span', {}, 'Pre-chequeo IA'),
+  );
+  precheckBtn.addEventListener('click', () => {
+    card.hide();
+    vscode.postMessage({ type: 'verifyBranchForTask' });
+  });
+
+  const rulesBtn = h(
+    'button',
+    {
+      class: 'task-btn',
+      type: 'button',
+      title: 'Insertar regla de verificación de rama en AGENTS.md, .clinerules o .cursorrules',
+    },
+    h('span', {}, 'AGENTS.md'),
+  );
+  rulesBtn.addEventListener('click', () => {
+    card.hide();
+    vscode.postMessage({ type: 'setupAgentRules' });
+  });
+
+  taskBar.append(taskBtn, precheckBtn, rulesBtn);
+
   const sections: Node[] = [
     h('div', { class: 'current-top' }, h('span', { class: 'eyebrow' }, 'Rama actual'), h('span', { class: 'repo-name' }, repo.name)),
     h('div', { class: 'current-name' }, icon(ICON_BRANCH, 'icon'), h('span', { class: 'name-text', title: name }, name)),
@@ -290,6 +336,7 @@ function renderHeader(repo: RepoState, protectedNow: boolean): void {
   ];
   if (meta.length > 0) sections.push(h('div', { class: 'meta' }, ...meta));
   if (base.length > 0) sections.push(h('div', { class: 'meta' }, ...base));
+  sections.push(taskBar);
   headerEl.replaceChildren(...sections);
 }
 

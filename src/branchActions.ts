@@ -1,4 +1,7 @@
+import { readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import * as vscode from 'vscode';
+import { evaluateAgentPrecheck, suggestTaskBranchName, upsertAgentRuleInContent } from './ai/taskContext';
 import { GitError } from './git/runner';
 import { evaluateGuard, validateBranchName } from './guards/branchGuards';
 import type { ConfirmPrompt, DirtyPrompt, DirtyResolution, GuardAction, GuardContext } from './guards/branchGuards';
@@ -10,6 +13,9 @@ export const CHECKOUT_COMMAND = 'branchpilot.checkout';
 export const CREATE_BRANCH_COMMAND = 'branchpilot.createBranch';
 export const RENAME_BRANCH_COMMAND = 'branchpilot.renameBranch';
 export const DELETE_BRANCH_COMMAND = 'branchpilot.deleteBranch';
+export const CREATE_TASK_BRANCH_COMMAND = 'branchpilot.createTaskBranch';
+export const VERIFY_TASK_BRANCH_COMMAND = 'branchpilot.verifyBranchForTask';
+export const SETUP_AGENT_RULES_COMMAND = 'branchpilot.setupAgentRules';
 
 function formatGitFailure(error: unknown): string {
   if (error instanceof GitError && error.stderr.trim()) {
@@ -273,4 +279,168 @@ export class BranchActions {
     });
     return picked?.value;
   }
+
+  /**
+   * Crea una rama para una tarea asistida por IA: pide descripción, sugiere un
+   * nombre convencional (`feat/...`, `fix/...`), permite elegir la base y la activa.
+   */
+  async createTaskBranch(): Promise<void> {
+    await this.repos.refresh();
+    const state = this.requireState();
+    if (!state) return;
+
+    const description = await vscode.window.showInputBox({
+      title: 'Crear rama para esta tarea (IA)',
+      prompt: 'Describe brevemente la tarea que vas a delegar al agente o implementar',
+      placeHolder: 'Ej. Corregir validación de email en formulario de login',
+      ignoreFocusOut: true,
+    });
+    if (!description?.trim()) return;
+
+    const existingLocal = new Set(state.branches.filter((b) => b.kind === 'local').map((b) => b.name));
+    const suggested = suggestTaskBranchName(description, existingLocal);
+
+    const chosenBase = await this.pickBaseBranch(state);
+    if (!chosenBase) return;
+
+    const rawName = await vscode.window.showInputBox({
+      title: `Confirmar nombre de rama (base: ${chosenBase})`,
+      prompt: 'Revisa o ajusta el nombre sugerido para la rama de esta tarea',
+      value: suggested,
+      ignoreFocusOut: true,
+      validateInput: (value) => {
+        const clean = value.trim();
+        const err = validateBranchName(clean);
+        if (err) return err;
+        if (existingLocal.has(clean)) return `Ya existe una rama local llamada «${clean}».`;
+        return undefined;
+      },
+    });
+    const name = rawName?.trim();
+    if (!name) return;
+
+    await this.repos.refresh();
+    const freshState = this.requireState();
+    if (!freshState) return;
+
+    if (!(await this.verifyAndPrepare({ kind: 'createBranch', name, base: chosenBase }, freshState))) return;
+
+    try {
+      await this.repos.createBranch(name, chosenBase);
+      void vscode.window.setStatusBarMessage(`BranchPilot: Lista rama de tarea «${name}»`, 4000);
+    } catch (error) {
+      void vscode.window.showErrorMessage(`No se pudo crear la rama de tarea «${name}»: ${formatGitFailure(error)}`);
+    }
+  }
+
+  /**
+   * Pre-chequeo interactivo antes de delegar trabajo a un agente de IA:
+   * muestra la rama actual y ofrece crear una rama de tarea si se está en una rama protegida o HEAD desacoplado.
+   */
+  async verifyBranchForTask(): Promise<boolean> {
+    await this.repos.refresh();
+    const state = this.requireState();
+    if (!state) return false;
+
+    const result = evaluateAgentPrecheck({
+      head: state.head,
+      workingTree: state.workingTree,
+      protection: readSettings().protection,
+      baseBranch: state.baseBranch,
+    });
+
+    const detail = result.details.join('\n');
+
+    if (result.status === 'blocked') {
+      void vscode.window.showErrorMessage(`BranchPilot: ${result.headline}`, { modal: true, detail });
+      return false;
+    }
+
+    if (result.suggestNewTaskBranch) {
+      const createOpt = 'Crear rama para esta tarea…';
+      const switchOpt = 'Cambiar a otra rama…';
+      const continueOpt = `Continuar en «${result.branchLabel}»`;
+      const choice = await vscode.window.showWarningMessage(
+        result.headline,
+        { modal: true, detail },
+        createOpt,
+        switchOpt,
+        continueOpt,
+      );
+      if (choice === createOpt) {
+        await this.createTaskBranch();
+        return true;
+      }
+      if (choice === switchOpt) {
+        await this.checkout();
+        return true;
+      }
+      return choice === continueOpt;
+    }
+
+    const createOpt = 'Crear nueva rama de tarea…';
+    const choice = await vscode.window.showInformationMessage(
+      `${result.headline} (${result.details.join(' ')})`,
+      createOpt,
+    );
+    if (choice === createOpt) {
+      await this.createTaskBranch();
+    }
+    return true;
+  }
+
+  /**
+   * Crea o actualiza las reglas de control de ramas en `AGENTS.md` (o `.clinerules` / `.cursorrules`)
+   * para que agentes como Antigravity, Claude Code, Cline o Cursor verifiquen la rama antes de editar.
+   */
+  async setupAgentRules(): Promise<void> {
+    const state = this.requireState();
+    if (!state) return;
+
+    const targetPick = await vscode.window.showQuickPick(
+      [
+        {
+          label: 'AGENTS.md',
+          description: 'Estándar multi-agente (Antigravity, Claude Code, Codex, OpenCode, Cursor)',
+          file: 'AGENTS.md',
+        },
+        {
+          label: '.clinerules',
+          description: 'Reglas de workspace para Cline / Roo Code',
+          file: '.clinerules',
+        },
+        {
+          label: '.cursorrules',
+          description: 'Reglas de workspace para Cursor',
+          file: '.cursorrules',
+        },
+      ],
+      {
+        title: 'Configurar reglas de rama para agentes de IA',
+        placeHolder: 'Elige el archivo donde insertar la regla de verificación de BranchPilot',
+      },
+    );
+    if (!targetPick) return;
+
+    const filePath = path.join(state.root, targetPick.file);
+    let existing: string | undefined;
+    try {
+      existing = await readFile(filePath, 'utf8');
+    } catch {
+      existing = undefined;
+    }
+
+    const updated = upsertAgentRuleInContent(existing, readSettings().protection.protectedBranches);
+    try {
+      await writeFile(filePath, updated, 'utf8');
+      const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
+      await vscode.window.showTextDocument(doc);
+      void vscode.window.showInformationMessage(
+        `BranchPilot: Regla de verificación de rama actualizada en ${targetPick.file}.`,
+      );
+    } catch (error) {
+      void vscode.window.showErrorMessage(`No se pudo escribir ${targetPick.file}: ${formatGitFailure(error)}`);
+    }
+  }
 }
+
