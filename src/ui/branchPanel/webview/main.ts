@@ -29,6 +29,12 @@ const ROW_HEIGHT = 54;
 
 const ICON_BRANCH =
   '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="4" cy="3.5" r="1.6"/><circle cx="4" cy="12.5" r="1.6"/><circle cx="12" cy="6" r="1.6"/><path d="M4 5.1v5.8"/><path d="M12 7.6c0 2.6-3.2 2.6-7 4.4"/></svg>';
+const ICON_PILOT =
+  '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 1.8 5.8 4.7-4.6-.9v3.6L8 10.3l-1.2-1.1V5.6L2.2 6.5z"/><path d="M8 1.8v3.8"/><circle cx="4.2" cy="13" r="1.3"/><circle cx="11.8" cy="13" r="1.3"/><path d="M6.8 9.2c-1.2 1-2.6 1.8-2.6 2.5M9.2 9.2c1.2 1 2.6 1.8 2.6 2.5"/></svg>';
+const ICON_COMMIT =
+  '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="2.5"/><path d="M1 8h4.5M10.5 8H15"/></svg>';
+const ICON_SCM =
+  '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="4" r="1.8"/><circle cx="5" cy="12" r="1.8"/><circle cx="11.5" cy="8" r="1.8"/><path d="M5 5.8v4.4"/><path d="M11.5 9.8c0 1.5-2 2.2-4.5 2.2"/></svg>';
 const ICON_REFRESH =
   '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.7-4"/><path d="M13.5 2.5v3h-3"/></svg>';
 const ICON_UNDO =
@@ -117,8 +123,9 @@ function buildShell(): void {
     {
       class: 'action-primary',
       type: 'button',
-      title: 'Crear nueva rama eligiendo la base',
-      'aria-label': 'Crear nueva rama',
+      'data-tooltip': s.newBranchBtn,
+      'data-tooltip-pos': 'bottom',
+      'aria-label': s.newBranchBtn,
     },
     icon(ICON_PLUS, 'icon'),
     h('span', {}, s.newBranchBtn),
@@ -131,7 +138,8 @@ function buildShell(): void {
   const undoBtn = h('button', {
     class: 'icon-button',
     type: 'button',
-    title: s.undoBtn,
+    'data-tooltip': s.undoBtnTooltip,
+    'data-tooltip-pos': 'bottom',
     'aria-label': s.undoBtn,
   });
   undoBtn.append(icon(ICON_UNDO, 'icon'));
@@ -143,7 +151,8 @@ function buildShell(): void {
   const refresh = h('button', {
     class: 'icon-button',
     type: 'button',
-    title: s.refreshBtnTitle,
+    'data-tooltip': s.refreshBtnTooltip,
+    'data-tooltip-pos': 'bottom',
     'aria-label': s.refreshBtnTitle,
   });
   refresh.append(icon(ICON_REFRESH, 'icon'));
@@ -314,7 +323,8 @@ function renderHeader(repo: RepoState, protectedNow: boolean): void {
     {
       class: 'task-btn primary',
       type: 'button',
-      title: 'Crear una rama nueva con nombre sugerido para tu próxima tarea con IA',
+      'data-tooltip': s.taskBranchTooltip,
+      'aria-label': s.taskBranchBtn,
     },
     icon(ICON_PLUS, 'icon'),
     h('span', {}, s.taskBranchBtn),
@@ -329,7 +339,8 @@ function renderHeader(repo: RepoState, protectedNow: boolean): void {
     {
       class: 'task-btn',
       type: 'button',
-      title: 'Verificar si la rama actual es segura antes de delegar trabajo a un agente',
+      'data-tooltip': s.precheckTooltip,
+      'aria-label': s.precheckBtn,
     },
     h('span', {}, s.precheckBtn),
   );
@@ -343,7 +354,8 @@ function renderHeader(repo: RepoState, protectedNow: boolean): void {
     {
       class: 'task-btn',
       type: 'button',
-      title: 'Insertar regla de verificación de rama en AGENTS.md, .clinerules o .cursorrules',
+      'data-tooltip': s.agentRulesTooltip,
+      'aria-label': s.agentRulesBtn,
     },
     h('span', {}, s.agentRulesBtn),
   );
@@ -360,7 +372,8 @@ function renderHeader(repo: RepoState, protectedNow: boolean): void {
       {
         class: 'task-btn rescue',
         type: 'button',
-        title: 'Trasladar los cambios actuales sin guardar hacia una nueva rama de tarea',
+        'data-tooltip': s.rescueDirtyTooltip,
+        'aria-label': s.rescueDirtyBtn,
       },
       icon(ICON_SWITCH, 'icon'),
       h('span', {}, s.rescueDirtyBtn),
@@ -374,12 +387,72 @@ function renderHeader(repo: RepoState, protectedNow: boolean): void {
 
   const sections: Node[] = [
     h('div', { class: 'current-top' }, h('span', { class: 'eyebrow' }, s.currentBranchEyebrow), h('span', { class: 'repo-name' }, repo.name)),
-    h('div', { class: 'current-name' }, icon(ICON_BRANCH, 'icon'), h('span', { class: 'name-text', title: name }, name)),
+    h('div', { class: 'current-name' }, icon(ICON_PILOT, 'icon'), h('span', { class: 'name-text', title: name }, name)),
     badges,
   ];
   if (meta.length > 0) sections.push(h('div', { class: 'meta' }, ...meta));
   if (base.length > 0) sections.push(h('div', { class: 'meta' }, ...base));
   sections.push(taskBar);
+
+  if (isDirty(wt)) {
+    const commitInput = h('input', {
+      class: 'commit-input',
+      type: 'text',
+      placeholder: s.quickCommitPlaceholder,
+      'aria-label': s.quickCommitPlaceholder,
+    }) as HTMLInputElement;
+
+    const commitBtn = h(
+      'button',
+      {
+        class: 'commit-btn',
+        type: 'button',
+        'data-tooltip': s.quickCommitBtn,
+        'aria-label': s.quickCommitBtn,
+      },
+      icon(ICON_COMMIT, 'icon'),
+      h('span', {}, s.quickCommitBtn),
+    );
+
+    const scmBtn = h(
+      'button',
+      {
+        class: 'commit-scm-btn',
+        type: 'button',
+        'data-tooltip': s.openScmTooltip,
+        'data-tooltip-pos': 'left',
+        'aria-label': s.openScmTooltip,
+      },
+      icon(ICON_SCM, 'icon'),
+    );
+
+    const doCommit = () => {
+      const msg = commitInput.value.trim();
+      if (!msg) {
+        commitInput.focus();
+        return;
+      }
+      card.hide();
+      vscode.postMessage({ type: 'quickCommit', message: msg });
+      commitInput.value = '';
+    };
+
+    commitBtn.addEventListener('click', doCommit);
+    commitInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        doCommit();
+      }
+    });
+
+    scmBtn.addEventListener('click', () => {
+      card.hide();
+      vscode.postMessage({ type: 'openScm' });
+    });
+
+    sections.push(h('div', { class: 'commit-bar' }, commitInput, commitBtn, scmBtn));
+  }
+
   headerEl.replaceChildren(...sections);
 }
 
@@ -397,7 +470,9 @@ function renderWorktrees(repo: RepoState): void {
     {
       class: 'wt-add-btn',
       type: 'button',
-      title: 'Crear un worktree en una carpeta paralela para otro agente',
+      'data-tooltip': s.addWorktreeTooltip,
+      'data-tooltip-pos': 'left',
+      'aria-label': s.addWorktreeBtn,
     },
     icon(ICON_PLUS, 'icon'),
     h('span', {}, s.addWorktreeBtn),
@@ -423,7 +498,7 @@ function renderWorktrees(repo: RepoState): void {
   for (const wt of secondary) {
     const label = wt.branch ?? `HEAD (${wt.head})`;
     const folder = folderBasename(wt.path);
-    const openBtn = makeRowAction(ICON_WINDOW, `Abrir worktree ${folder} en nueva ventana`, () =>
+    const openBtn = makeRowAction(ICON_WINDOW, s.openWorktreeTooltip(folder), () =>
       vscode.postMessage({ type: 'openWorktree', path: wt.path }),
     );
     const itemActions = h('span', { class: 'wt-item-actions' }, openBtn);
@@ -431,7 +506,7 @@ function renderWorktrees(repo: RepoState): void {
       itemActions.append(
         makeRowAction(
           ICON_TRASH,
-          `Quitar worktree ${folder}`,
+          s.removeWorktreeTooltip(folder),
           () => vscode.postMessage({ type: 'removeWorktree', path: wt.path }),
           true,
         ),
@@ -509,7 +584,8 @@ function renderRepos(repositories: RepoOverview[]): void {
     {
       class: `repos-filter-btn${ui.onlyActiveRepos ? ' active' : ''}`,
       type: 'button',
-      title: 'Filtrar repositorios con cambios sin guardar, ramas sin fusionar o worktrees paralelos',
+      'data-tooltip': s.filterActiveReposTooltip,
+      'aria-label': s.filterActiveRepos(activeCount, repositories.length, ui.onlyActiveRepos),
     },
     s.filterActiveRepos(activeCount, repositories.length, ui.onlyActiveRepos),
   );
@@ -562,8 +638,9 @@ function renderRepos(repositories: RepoOverview[]): void {
       {
         class: 'repo-open-btn',
         type: 'button',
-        title: `Abrir ${r.name} en una nueva ventana del IDE`,
-        'aria-label': `Abrir ${r.name} en nueva ventana`,
+        'data-tooltip': s.openRepoInWindowTooltip(r.name),
+        'data-tooltip-pos': 'left',
+        'aria-label': s.openRepoInWindowTooltip(r.name),
       },
       icon(ICON_WINDOW, 'icon'),
     );
@@ -580,10 +657,11 @@ function renderRepos(repositories: RepoOverview[]): void {
 
 function renderFooter(repo: RepoState): void {
   if (!footerEl) return;
+  const s = strings();
   const parts: string[] = [];
-  if (repo.fetchedAt) parts.push(`Remotas actualizadas ${relativeTime(repo.fetchedAt / 1000, Date.now())} (último fetch).`);
-  else parts.push('Sin fetch registrado: las ramas remotas pueden estar desactualizadas.');
-  if (!repo.baseBranch) parts.push('No se detectó rama base; no se muestran ahead/behind.');
+  if (repo.fetchedAt) parts.push(s.footerRemotesUpdated(relativeTime(repo.fetchedAt / 1000, Date.now())));
+  else parts.push(s.footerNoFetch);
+  if (!repo.baseBranch) parts.push(s.footerNoBase);
   footerEl.textContent = parts.join(' ');
 }
 
@@ -655,7 +733,8 @@ function makeRowAction(svg: string, title: string, onClick: () => void, danger =
   const btn = h('button', {
     class: `row-action${danger ? ' danger' : ''}`,
     type: 'button',
-    title,
+    'data-tooltip': title,
+    'data-tooltip-pos': 'left',
     'aria-label': title,
     tabindex: '-1',
   });
@@ -678,21 +757,37 @@ function renderRow(
   now: number,
 ): HTMLElement {
   const { baseBranch } = repo;
+  const s = strings();
   const linkedWorktree =
     branch.kind === 'local' ? repo.worktrees.find((w) => !w.isCurrent && w.branch === branch.name) : undefined;
 
   const tags = h('span', { class: 'tags' });
-  tags.append(h('span', { class: `tag ${branch.kind}` }, branch.kind === 'local' ? 'local' : 'remota'));
-  if (branch.isCurrent) tags.append(h('span', { class: 'tag current-tag' }, 'actual'));
+  if (branch.kind === 'remote') {
+    tags.append(h('span', { class: 'tag remote' }, s.badgeRemote));
+  }
+  if (branch.isCurrent) {
+    tags.append(h('span', { class: 'tag current-tag' }, s.badgeCurrent));
+  }
   if (linkedWorktree) {
     tags.append(
-      h('span', { class: 'tag worktree-tag', title: `Activa en worktree: ${linkedWorktree.path}` }, 'worktree'),
+      h(
+        'span',
+        {
+          class: 'tag worktree-tag',
+          'data-tooltip': `Worktree: ${folderBasename(linkedWorktree.path)}`,
+        },
+        s.badgeWorktree,
+      ),
     );
   }
-  if (branch.kind === 'local' && branch.name === baseBranch) tags.append(h('span', { class: 'tag base' }, 'base'));
-  if (branch.merged) tags.append(h('span', { class: 'tag merged' }, 'fusionada'));
+  if (branch.kind === 'local' && branch.name === baseBranch && !branch.isCurrent) {
+    tags.append(h('span', { class: 'tag base' }, s.badgeBase));
+  }
+  if (branch.merged) {
+    tags.append(h('span', { class: 'tag merged' }, s.badgeMerged));
+  }
   if (branch.kind === 'local' && isListedProtected(branch.name, protectedBranches)) {
-    tags.append(h('span', { class: 'tag protected' }, 'protegida'));
+    tags.append(h('span', { class: 'tag protected' }, s.badgeProtected));
   }
 
   const right = h('span', { class: 'track' });
@@ -703,32 +798,32 @@ function renderRow(
   const actions = h('span', { class: 'row-actions' });
   if (linkedWorktree) {
     actions.append(
-      makeRowAction(ICON_WINDOW, `Abrir worktree de ${branch.name} en nueva ventana`, () =>
+      makeRowAction(ICON_WINDOW, s.openWorktreeTooltip(folderBasename(linkedWorktree.path)), () =>
         vscode.postMessage({ type: 'openWorktree', path: linkedWorktree.path }),
       ),
     );
   } else if (!branch.isCurrent) {
     actions.append(
-      makeRowAction(ICON_SWITCH, `Cambiar a ${branch.name}`, () =>
+      makeRowAction(ICON_SWITCH, s.checkoutActionTooltip(branch.name), () =>
         vscode.postMessage({ type: 'checkout', ref: branch.fullRef }),
       ),
     );
     if (branch.kind === 'local') {
       actions.append(
-        makeRowAction(ICON_WINDOW, `Crear worktree paralelo para ${branch.name}`, () =>
+        makeRowAction(ICON_WINDOW, s.createWorktreeActionTooltip(branch.name), () =>
           vscode.postMessage({ type: 'createWorktree', ref: branch.fullRef }),
         ),
       );
     }
   }
   actions.append(
-    makeRowAction(ICON_PLUS, `Nueva rama desde ${branch.name}`, () =>
+    makeRowAction(ICON_PLUS, s.newBranchFromTooltip(branch.name), () =>
       vscode.postMessage({ type: 'createBranch', base: branch.name }),
     ),
   );
   if (branch.kind === 'local') {
     actions.append(
-      makeRowAction(ICON_EDIT, `Renombrar ${branch.name}`, () =>
+      makeRowAction(ICON_EDIT, s.renameBranchTooltip(branch.name), () =>
         vscode.postMessage({ type: 'renameBranch', ref: branch.fullRef }),
       ),
     );
@@ -736,7 +831,7 @@ function renderRow(
       actions.append(
         makeRowAction(
           ICON_TRASH,
-          `Eliminar ${branch.name}`,
+          s.deleteBranchTooltip(branch.name),
           () => vscode.postMessage({ type: 'deleteBranch', ref: branch.fullRef }),
           true,
         ),
