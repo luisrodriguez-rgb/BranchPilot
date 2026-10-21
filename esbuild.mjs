@@ -29,6 +29,14 @@ const targets = [
     platform: 'browser',
     format: 'iife',
   },
+  {
+    ...common,
+    entryPoints: ['src/cli.ts'],
+    outfile: 'dist/cli.js',
+    platform: 'node',
+    format: 'cjs',
+    banner: { js: '#!/usr/bin/env node' },
+  },
 ];
 
 if (watch) {

@@ -26,6 +26,9 @@
     "worktree"
   ],
   "main": "./dist/extension.js",
+  "bin": {
+    "branchpilot": "./dist/cli.js"
+  },
   "activationEvents": [
     "onStartupFinished"
   ],
@@ -96,6 +99,10 @@
       {
         "command": "branchpilot.removeWorktree",
         "title": "BranchPilot: Quitar worktree secundario…"
+      },
+      {
+        "command": "branchpilot.diagnoseEnvironment",
+        "title": "BranchPilot: Diagnosticar compatibilidad del IDE y Git"
       }
     ],
     "configuration": {

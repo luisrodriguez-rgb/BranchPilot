@@ -7,6 +7,7 @@ import { evaluateGuard, validateBranchName } from './guards/branchGuards';
 import type { ConfirmPrompt, DirtyPrompt, DirtyResolution, GuardAction, GuardContext } from './guards/branchGuards';
 import type { RepoService } from './repoService';
 import { readSettings } from './settings';
+import { buildCompatibilityReport, probeGitVersion } from './shared/ideCompatibility';
 import type { BranchInfo, RepoState } from './shared/types';
 
 export const CHECKOUT_COMMAND = 'branchpilot.checkout';
@@ -19,6 +20,7 @@ export const SETUP_AGENT_RULES_COMMAND = 'branchpilot.setupAgentRules';
 export const CREATE_WORKTREE_COMMAND = 'branchpilot.createWorktree';
 export const OPEN_WORKTREE_COMMAND = 'branchpilot.openWorktree';
 export const REMOVE_WORKTREE_COMMAND = 'branchpilot.removeWorktree';
+export const DIAGNOSE_ENV_COMMAND = 'branchpilot.diagnoseEnvironment';
 
 function formatGitFailure(error: unknown): string {
   if (error instanceof GitError && error.stderr.trim()) {
@@ -632,5 +634,34 @@ export class BranchActions {
       void vscode.window.showErrorMessage(`No se pudo quitar el worktree: ${formatGitFailure(error)}`);
     }
   }
+
+  /** Muestra un diagnóstico completo de compatibilidad del IDE y versión de Git. */
+  async diagnoseEnvironment(): Promise<void> {
+    const cwd = this.repos.state?.root ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+    const gitVersion = await probeGitVersion(cwd);
+    const hasVscodeGitExtension = vscode.extensions.getExtension('vscode.git') !== undefined;
+
+    const report = buildCompatibilityReport({
+      appName: vscode.env.appName,
+      uriScheme: vscode.env.uriScheme,
+      vscodeVersion: vscode.version,
+      hasVscodeGitExtension,
+      gitVersion,
+    });
+
+    const detail = [
+      `IDE detectado: ${report.appName} (familia: ${report.ideFamily})`,
+      `Motor VS Code: ${report.vscodeVersion}`,
+      `Versión de Git: ${report.gitVersion?.raw ?? 'No detectado'}`,
+      '',
+      ...report.notes,
+    ].join('\n');
+
+    void vscode.window.showInformationMessage(
+      `BranchPilot — Diagnóstico de compatibilidad (${report.ideFamily})`,
+      { modal: true, detail },
+    );
+  }
 }
+
 
