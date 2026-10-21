@@ -70,3 +70,14 @@ describe('protección', () => {
     expect(requiresConfirmation('main', { ...base, mode: 'off' })).toBe(false);
   });
 });
+
+describe('isFromWebview', () => {
+  it('valida mensajes reconocidos incluyendo quickCommit y openScm', async () => {
+    const { isFromWebview } = await import('../../src/shared/messages');
+    expect(isFromWebview({ type: 'openScm' })).toBe(true);
+    expect(isFromWebview({ type: 'quickCommit', message: 'feat: new test' })).toBe(true);
+    expect(isFromWebview({ type: 'quickCommit' })).toBe(false);
+    expect(isFromWebview({ type: 'invalid' })).toBe(false);
+    expect(isFromWebview(null)).toBe(false);
+  });
+});

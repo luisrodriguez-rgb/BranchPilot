@@ -35,11 +35,20 @@ export type FromWebview =
   | { type: 'openWorktree'; path: string }
   | { type: 'removeWorktree'; path: string }
   | { type: 'selectRepo'; root: string }
-  | { type: 'openRepoInWindow'; root: string };
+  | { type: 'openRepoInWindow'; root: string }
+  | { type: 'openScm' }
+  | { type: 'quickCommit'; message: string };
 
 export function isFromWebview(value: unknown): value is FromWebview {
   if (typeof value !== 'object' || value === null) return false;
-  const message = value as { type?: unknown; ref?: unknown; base?: unknown; path?: unknown; root?: unknown };
+  const message = value as {
+    type?: unknown;
+    ref?: unknown;
+    base?: unknown;
+    path?: unknown;
+    root?: unknown;
+    message?: unknown;
+  };
   switch (message.type) {
     case 'ready':
     case 'refresh':
@@ -48,7 +57,10 @@ export function isFromWebview(value: unknown): value is FromWebview {
     case 'moveDirtyToTaskBranch':
     case 'verifyBranchForTask':
     case 'setupAgentRules':
+    case 'openScm':
       return true;
+    case 'quickCommit':
+      return typeof message.message === 'string';
     case 'requestCommits':
     case 'checkout':
     case 'renameBranch':

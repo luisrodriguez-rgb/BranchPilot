@@ -30,6 +30,38 @@ export interface UiStrings {
   filterMerged: string;
   filterStale: string;
   branchesCount: (visible: number, total: number) => string;
+  // Badges
+  badgeRemote: string;
+  badgeCurrent: string;
+  badgeBase: string;
+  badgeMerged: string;
+  badgeProtected: string;
+  badgeWorktree: string;
+  // Tooltips
+  taskBranchTooltip: string;
+  precheckTooltip: string;
+  agentRulesTooltip: string;
+  rescueDirtyTooltip: string;
+  addWorktreeTooltip: string;
+  openWorktreeTooltip: (folder: string) => string;
+  removeWorktreeTooltip: (folder: string) => string;
+  undoBtnTooltip: string;
+  refreshBtnTooltip: string;
+  filterActiveReposTooltip: string;
+  openRepoInWindowTooltip: (name: string) => string;
+  checkoutActionTooltip: (branch: string) => string;
+  createWorktreeActionTooltip: (branch: string) => string;
+  newBranchFromTooltip: (branch: string) => string;
+  renameBranchTooltip: (branch: string) => string;
+  deleteBranchTooltip: (branch: string) => string;
+  // Quick commit & SCM
+  quickCommitBtn: string;
+  quickCommitPlaceholder: string;
+  openScmTooltip: string;
+  // Footer
+  footerRemotesUpdated: (time: string) => string;
+  footerNoFetch: string;
+  footerNoBase: string;
 }
 
 const ES_STRINGS: UiStrings = {
@@ -63,6 +95,34 @@ const ES_STRINGS: UiStrings = {
   filterMerged: 'Fusionadas',
   filterStale: 'Antiguas',
   branchesCount: (visible, total) => (visible === total ? `${total} ramas` : `${visible} de ${total} ramas`),
+  badgeRemote: 'remota',
+  badgeCurrent: 'actual',
+  badgeBase: 'base',
+  badgeMerged: 'fusionada',
+  badgeProtected: 'protegida',
+  badgeWorktree: 'worktree',
+  taskBranchTooltip: 'Crear rama aislada para una nueva tarea de IA',
+  precheckTooltip: 'Verificar si la rama actual es segura para que un agente opere',
+  agentRulesTooltip: 'Sincronizar AGENTS.md y reglas para LLMs en el repositorio',
+  rescueDirtyTooltip: 'Trasladar cambios sin guardar hacia una nueva rama de tarea',
+  addWorktreeTooltip: 'Crear un worktree paralelo en otra carpeta para otro agente',
+  openWorktreeTooltip: (folder) => `Abrir worktree ${folder} en nueva ventana`,
+  removeWorktreeTooltip: (folder) => `Quitar worktree ${folder}`,
+  undoBtnTooltip: 'Deshacer la última acción de ramas (restaurar rama, etc.)',
+  refreshBtnTooltip: 'Actualizar ramas y estado del repositorio',
+  filterActiveReposTooltip: 'Filtrar repositorios con cambios sin guardar o worktrees paralelos',
+  openRepoInWindowTooltip: (name) => `Abrir ${name} en una nueva ventana del IDE`,
+  checkoutActionTooltip: (b) => `Cambiar a la rama ${b}`,
+  createWorktreeActionTooltip: (b) => `Crear worktree paralelo para ${b}`,
+  newBranchFromTooltip: (b) => `Nueva rama desde ${b}`,
+  renameBranchTooltip: (b) => `Renombrar ${b}`,
+  deleteBranchTooltip: (b) => `Eliminar ${b}`,
+  quickCommitBtn: 'Commit',
+  quickCommitPlaceholder: 'Mensaje de commit…',
+  openScmTooltip: 'Abrir en Source Control para revisar cambios o autogenerar mensaje con Copilot',
+  footerRemotesUpdated: (time) => `Remotas actualizadas ${time} (último fetch).`,
+  footerNoFetch: 'Sin fetch registrado: las ramas remotas pueden estar desactualizadas.',
+  footerNoBase: 'No se detectó rama base; no se muestran ahead/behind.',
 };
 
 const EN_STRINGS: UiStrings = {
@@ -96,6 +156,34 @@ const EN_STRINGS: UiStrings = {
   filterMerged: 'Merged',
   filterStale: 'Stale',
   branchesCount: (visible, total) => (visible === total ? `${total} branches` : `${visible} of ${total} branches`),
+  badgeRemote: 'remote',
+  badgeCurrent: 'current',
+  badgeBase: 'base',
+  badgeMerged: 'merged',
+  badgeProtected: 'protected',
+  badgeWorktree: 'worktree',
+  taskBranchTooltip: 'Create isolated branch for a new AI task',
+  precheckTooltip: 'Verify whether the current branch is safe for AI agents',
+  agentRulesTooltip: 'Sync AGENTS.md and agent rules in repository',
+  rescueDirtyTooltip: 'Move uncommitted changes to a new task branch',
+  addWorktreeTooltip: 'Create parallel worktree in sibling folder for another agent',
+  openWorktreeTooltip: (folder) => `Open worktree ${folder} in new window`,
+  removeWorktreeTooltip: (folder) => `Remove worktree ${folder}`,
+  undoBtnTooltip: 'Undo last branch action (restore deleted branch, etc.)',
+  refreshBtnTooltip: 'Refresh branches and repository status',
+  filterActiveReposTooltip: 'Filter repositories with pending changes or parallel worktrees',
+  openRepoInWindowTooltip: (name) => `Open ${name} in a new IDE window`,
+  checkoutActionTooltip: (b) => `Switch to branch ${b}`,
+  createWorktreeActionTooltip: (b) => `Create parallel worktree for ${b}`,
+  newBranchFromTooltip: (b) => `New branch from ${b}`,
+  renameBranchTooltip: (b) => `Rename ${b}`,
+  deleteBranchTooltip: (b) => `Delete ${b}`,
+  quickCommitBtn: 'Commit',
+  quickCommitPlaceholder: 'Commit message…',
+  openScmTooltip: 'Open in Source Control to inspect diffs or generate message with Copilot',
+  footerRemotesUpdated: (time) => `Remotes updated ${time} (last fetch).`,
+  footerNoFetch: 'No fetch recorded: remote branches may be outdated.',
+  footerNoBase: 'No base branch detected; ahead/behind not shown.',
 };
 
 export function resolveLocale(languageTag?: string): Locale {

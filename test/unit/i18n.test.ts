@@ -22,5 +22,11 @@ describe('i18n (es / en)', () => {
     expect(en.changesBadge(3)).toBe('3 changes');
     expect(es.branchesCount(5, 10)).toBe('5 de 10 ramas');
     expect(en.branchesCount(5, 10)).toBe('5 of 10 branches');
+    expect(es.badgeProtected).toBe('protegida');
+    expect(en.badgeProtected).toBe('protected');
+    expect(es.badgeCurrent).toBe('actual');
+    expect(en.badgeCurrent).toBe('current');
+    expect(es.quickCommitBtn).toBe('Commit');
+    expect(en.quickCommitBtn).toBe('Commit');
   });
 });
