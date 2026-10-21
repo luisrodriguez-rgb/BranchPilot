@@ -290,6 +290,12 @@ body {
   color: var(--bp-orange);
 }
 
+.ahead.zero,
+.behind.zero {
+  color: var(--bp-muted);
+  opacity: 0.4;
+}
+
 .task-actions {
   display: flex;
   flex-wrap: wrap;
@@ -597,6 +603,7 @@ button:focus-visible,
 .row-main {
   flex: 1;
   min-width: 0;
+  padding-right: 10px;
 }
 
 .row-title {
@@ -604,10 +611,13 @@ button:focus-visible,
   align-items: center;
   gap: 6px;
   min-width: 0;
+  padding-right: 4px;
 }
 
 .row-name {
+  flex: 0 1 auto;
   min-width: 0;
+  max-width: 65%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -671,6 +681,8 @@ button:focus-visible,
   flex: none;
   flex-direction: column;
   align-items: flex-end;
+  justify-content: center;
+  min-width: 24px;
   font-size: 11px;
   line-height: 1.3;
 }
@@ -971,6 +983,10 @@ button:focus-visible,
   background: color-mix(in srgb, var(--vscode-editor-background, transparent) 60%, transparent);
 }
 
+.commit-bar.caution {
+  border-color: color-mix(in srgb, var(--bp-orange) 40%, var(--bp-border));
+}
+
 .commit-input {
   flex: 1;
   min-width: 0;
@@ -1006,6 +1022,16 @@ button:focus-visible,
 
 .commit-btn:hover {
   background: var(--vscode-button-hoverBackground);
+}
+
+.commit-btn.caution {
+  color: var(--bp-orange);
+  background: color-mix(in srgb, var(--bp-orange) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--bp-orange) 55%, transparent);
+}
+
+.commit-btn.caution:hover {
+  background: color-mix(in srgb, var(--bp-orange) 22%, transparent);
 }
 
 .commit-scm-btn {

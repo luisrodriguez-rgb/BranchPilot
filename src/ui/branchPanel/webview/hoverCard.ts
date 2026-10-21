@@ -1,5 +1,6 @@
 import { divergenceText, integrationText } from '../../../shared/branchSummary';
-import { relativeTime } from '../../../shared/time';
+import type { Locale } from '../../../shared/i18n';
+import { relativeTime, shortRelativeTime } from '../../../shared/time';
 import type { BranchInfo, CommitSummary } from '../../../shared/types';
 import { h } from './dom';
 
@@ -13,6 +14,7 @@ interface CommitsEntry {
 export interface HoverCardOptions {
   host: HTMLElement;
   requestCommits: (fullRef: string) => void;
+  getLocale?: () => Locale;
 }
 
 const SHOW_DELAY_MS = 250;
@@ -33,13 +35,17 @@ export class HoverCard {
   private readonly commits = new Map<string, CommitsEntry>();
 
   constructor(private readonly options: HoverCardOptions) {
-    this.el = h('div', { class: 'hover-card', role: 'dialog', 'aria-label': 'Detalle de la rama', hidden: '' });
+    this.el = h('div', { class: 'hover-card', role: 'dialog', 'aria-label': 'Branch details', hidden: '' });
     this.el.addEventListener('mouseenter', () => this.cancelHide());
     this.el.addEventListener('mouseleave', () => this.scheduleHide());
     options.host.append(this.el);
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') this.hide();
     });
+  }
+
+  private locale(): Locale {
+    return this.options.getLocale ? this.options.getLocale() : 'es';
   }
 
   get visible(): boolean {
@@ -133,10 +139,11 @@ export class HoverCard {
     const branch = this.branch;
     if (!branch) return;
     const now = Date.now();
+    const loc = this.locale();
 
     const tabs = h('div', { class: 'hc-tabs', role: 'tablist' });
     for (const [id, label] of [
-      ['summary', 'Resumen'],
+      ['summary', loc === 'en' ? 'Summary' : 'Resumen'],
       ['commits', 'Commits'],
     ] as const) {
       const active = this.tab === id;
@@ -145,46 +152,59 @@ export class HoverCard {
       tabs.append(button);
     }
 
+    const kindLabel = branch.kind === 'local' ? 'local' : loc === 'en' ? 'remote' : 'remota';
     const title = h(
       'div',
       { class: 'hc-title' },
       h('span', { class: `hc-dot ${branch.kind}` }),
       h('span', { class: 'hc-name', title: branch.name }, branch.name),
-      h('span', { class: 'tag' }, branch.kind === 'local' ? 'local' : 'remota'),
+      h('span', { class: 'tag' }, kindLabel),
     );
 
-    this.el.replaceChildren(title, tabs, this.tab === 'summary' ? this.summary(branch, now) : this.history(branch, now));
+    this.el.replaceChildren(title, tabs, this.tab === 'summary' ? this.summary(branch, now, loc) : this.history(branch, now, loc));
   }
 
-  private summary(branch: BranchInfo, now: number): HTMLElement {
+  private summary(branch: BranchInfo, now: number, loc: Locale): HTMLElement {
     const c = branch.lastCommit;
     const body = h('div', { class: 'hc-body' });
     body.append(
       h('div', { class: 'hc-commit' }, h('span', { class: 'mono' }, c.hash), ` ${c.subject || '—'}`),
-      h('div', { class: 'hc-meta' }, `${c.author} · ${relativeTime(c.date, now)}`),
-      h('div', { class: 'hc-meta' }, new Date(c.date * 1000).toLocaleString()),
+      h('div', { class: 'hc-meta' }, `${c.author} · ${relativeTime(c.date, now, loc)}`),
+      h('div', { class: 'hc-meta' }, new Date(c.date * 1000).toLocaleString(loc === 'en' ? 'en-US' : 'es-ES')),
     );
-    const lines = [
-      divergenceText(branch, this.baseBranch),
-      integrationText(branch, this.baseBranch),
-      branch.upstream ? `Sigue a ${branch.upstream}.` : branch.kind === 'local' ? 'Sin rama remota asociada.' : undefined,
-      branch.kind === 'remote' ? 'Dato remoto: válido hasta el último fetch.' : undefined,
-    ];
+    const upstreamLine = branch.upstream
+      ? loc === 'en'
+        ? `Tracks ${branch.upstream}.`
+        : `Sigue a ${branch.upstream}.`
+      : branch.kind === 'local'
+        ? loc === 'en'
+          ? 'No upstream branch.'
+          : 'Sin rama remota asociada.'
+        : undefined;
+    const remoteLine =
+      branch.kind === 'remote'
+        ? loc === 'en'
+          ? 'Remote ref: valid as of last fetch.'
+          : 'Dato remoto: válido hasta el último fetch.'
+        : undefined;
+    const lines = [divergenceText(branch, this.baseBranch, loc), integrationText(branch, this.baseBranch, loc), upstreamLine, remoteLine];
     const facts = h('ul', { class: 'hc-facts' });
     for (const line of lines) if (line) facts.append(h('li', {}, line));
     body.append(facts);
     return body;
   }
 
-  private history(branch: BranchInfo, now: number): HTMLElement {
+  private history(branch: BranchInfo, now: number, loc: Locale): HTMLElement {
     const entry = this.commits.get(cacheKey(branch));
     const body = h('div', { class: 'hc-body' });
     if (!entry || (!entry.commits && !entry.error)) {
-      body.append(h('div', { class: 'hc-meta' }, 'Cargando commits…'));
+      body.append(h('div', { class: 'hc-meta' }, loc === 'en' ? 'Loading commits…' : 'Cargando commits…'));
     } else if (entry.error) {
-      body.append(h('div', { class: 'hc-error' }, `No se pudo leer el historial: ${entry.error}`));
+      body.append(
+        h('div', { class: 'hc-error' }, loc === 'en' ? `Could not read history: ${entry.error}` : `No se pudo leer el historial: ${entry.error}`),
+      );
     } else if (!entry.commits?.length) {
-      body.append(h('div', { class: 'hc-meta' }, 'Sin commits.'));
+      body.append(h('div', { class: 'hc-meta' }, loc === 'en' ? 'No commits.' : 'Sin commits.'));
     } else {
       const list = h('ul', { class: 'hc-commits' });
       for (const commit of entry.commits) {
@@ -194,7 +214,7 @@ export class HoverCard {
             {},
             h('span', { class: 'mono' }, commit.hash),
             h('span', { class: 'hc-subject', title: commit.subject }, commit.subject || '—'),
-            h('span', { class: 'hc-when' }, relativeTime(commit.date, now).replace('hace ', '')),
+            h('span', { class: 'hc-when' }, shortRelativeTime(commit.date, now, loc)),
           ),
         );
       }

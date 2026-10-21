@@ -1,7 +1,7 @@
 import { countByFilter, filterBranches, sortBranches } from '../../../shared/filter';
 import type { FilterId } from '../../../shared/filter';
-import { getUiStrings } from '../../../shared/i18n';
-import type { UiStrings } from '../../../shared/i18n';
+import { getUiStrings, resolveLocale } from '../../../shared/i18n';
+import type { Locale, UiStrings } from '../../../shared/i18n';
 import type { FromWebview, PanelState, ToWebview } from '../../../shared/messages';
 import { isListedProtected } from '../../../shared/protection';
 import { relativeTime } from '../../../shared/time';
@@ -60,6 +60,10 @@ const ui = {
   visible: [] as BranchInfo[],
 };
 
+function currentLocale(): Locale {
+  return resolveLocale(ui.panel.locale ?? navigator.language);
+}
+
 function strings(): UiStrings {
   return getUiStrings(ui.panel.locale ?? navigator.language);
 }
@@ -71,6 +75,7 @@ function persist(): void {
 const card = new HoverCard({
   host: document.body,
   requestCommits: (ref) => vscode.postMessage({ type: 'requestCommits', ref }),
+  getLocale: () => currentLocale(),
 });
 
 const app = document.getElementById('app') as HTMLElement;
@@ -300,7 +305,7 @@ function renderHeader(repo: RepoState, protectedNow: boolean): void {
   if (current) {
     meta.push(
       h('span', { class: 'mono' }, current.lastCommit.hash),
-      ` ${current.lastCommit.subject} · ${relativeTime(current.lastCommit.date, Date.now())}`,
+      ` ${current.lastCommit.subject} · ${relativeTime(current.lastCommit.date, Date.now(), currentLocale())}`,
     );
   } else if (!head.detached) {
     meta.push(s.noCommitsYet);
@@ -310,9 +315,9 @@ function renderHeader(repo: RepoState, protectedNow: boolean): void {
   if (repo.baseBranch && current && current.name !== repo.baseBranch && current.ahead !== undefined) {
     base.push(
       s.versusBase(repo.baseBranch),
-      h('span', { class: 'ahead' }, `↑${current.ahead}`),
+      h('span', { class: `ahead${current.ahead === 0 ? ' zero' : ''}` }, `↑${current.ahead}`),
       ' ',
-      h('span', { class: 'behind' }, `↓${current.behind ?? 0}`),
+      h('span', { class: `behind${(current.behind ?? 0) === 0 ? ' zero' : ''}` }, `↓${current.behind ?? 0}`),
     );
   }
 
@@ -402,16 +407,19 @@ function renderHeader(repo: RepoState, protectedNow: boolean): void {
       'aria-label': s.quickCommitPlaceholder,
     }) as HTMLInputElement;
 
+    const commitBtnLabel = protectedNow ? s.quickCommitProtectedBtn(name) : s.quickCommitBtn;
+    const commitBtnTooltip = protectedNow ? s.quickCommitProtectedTooltip(name) : s.quickCommitBtn;
+
     const commitBtn = h(
       'button',
       {
-        class: 'commit-btn',
+        class: `commit-btn${protectedNow ? ' caution' : ''}`,
         type: 'button',
-        'data-tooltip': s.quickCommitBtn,
-        'aria-label': s.quickCommitBtn,
+        'data-tooltip': commitBtnTooltip,
+        'aria-label': commitBtnLabel,
       },
       icon(ICON_COMMIT, 'icon'),
-      h('span', {}, s.quickCommitBtn),
+      h('span', {}, commitBtnLabel),
     );
 
     const scmBtn = h(
@@ -450,7 +458,7 @@ function renderHeader(repo: RepoState, protectedNow: boolean): void {
       vscode.postMessage({ type: 'openScm' });
     });
 
-    sections.push(h('div', { class: 'commit-bar' }, commitInput, commitBtn, scmBtn));
+    sections.push(h('div', { class: `commit-bar${protectedNow ? ' caution' : ''}` }, commitInput, commitBtn, scmBtn));
   }
 
   headerEl.replaceChildren(...sections);
@@ -602,15 +610,31 @@ function renderRepos(repositories: RepoOverview[]): void {
     filterToggle,
   );
 
-  const list = h('div', { class: 'repos-list', role: 'tablist', 'aria-label': 'Seleccionar repositorio' });
+  const loc = currentLocale();
+  const list = h(
+    'div',
+    {
+      class: 'repos-list',
+      role: 'tablist',
+      'aria-label': loc === 'en' ? 'Select repository' : 'Seleccionar repositorio',
+    },
+  );
   for (const r of visibleRepos) {
     const branchLabel = r.detached ? `HEAD@${r.shortHash ?? '—'}` : (r.branch ?? 'HEAD');
-    const tooltipParts = [
-      `${r.name} (${r.root})`,
-      `Rama activa: ${branchLabel}`,
-      `${r.localBranches} ramas locales · ${r.unmergedLocalBranches} sin fusionar · ${r.staleLocalBranches} antiguas`,
-      r.dirty ? `${r.changesCount} cambios pendientes` : 'Árbol limpio',
-    ];
+    const tooltipParts =
+      loc === 'en'
+        ? [
+            `${r.name} (${r.root})`,
+            `Active branch: ${branchLabel}`,
+            `${r.localBranches} local branches · ${r.unmergedLocalBranches} unmerged · ${r.staleLocalBranches} stale`,
+            r.dirty ? `${r.changesCount} pending changes` : 'Clean working tree',
+          ]
+        : [
+            `${r.name} (${r.root})`,
+            `Rama activa: ${branchLabel}`,
+            `${r.localBranches} ramas locales · ${r.unmergedLocalBranches} sin fusionar · ${r.staleLocalBranches} antiguas`,
+            r.dirty ? `${r.changesCount} cambios pendientes` : 'Árbol limpio',
+          ];
     const pill = h(
       'button',
       {
@@ -624,7 +648,16 @@ function renderRepos(repositories: RepoOverview[]): void {
       h('span', { class: 'repo-pill-branch' }, `${branchLabel}${r.dirty ? '*' : ''}`),
     );
     if (r.unmergedLocalBranches > 0) {
-      pill.append(h('span', { class: 'repo-pill-stat', title: 'Ramas locales sin fusionar' }, `${r.unmergedLocalBranches}↗`));
+      pill.append(
+        h(
+          'span',
+          {
+            class: 'repo-pill-stat',
+            title: loc === 'en' ? 'Unmerged local branches' : 'Ramas locales sin fusionar',
+          },
+          `${r.unmergedLocalBranches}↗`,
+        ),
+      );
     }
     pill.addEventListener('click', () => {
       if (!r.isActive) {
@@ -659,7 +692,7 @@ function renderFooter(repo: RepoState): void {
   if (!footerEl) return;
   const s = strings();
   const parts: string[] = [];
-  if (repo.fetchedAt) parts.push(s.footerRemotesUpdated(relativeTime(repo.fetchedAt / 1000, Date.now())));
+  if (repo.fetchedAt) parts.push(s.footerRemotesUpdated(relativeTime(repo.fetchedAt / 1000, Date.now(), currentLocale())));
   else parts.push(s.footerNoFetch);
   if (!repo.baseBranch) parts.push(s.footerNoBase);
   footerEl.textContent = parts.join(' ');
@@ -698,12 +731,13 @@ function renderList(resetScroll: boolean): void {
 function renderRows(): void {
   const ctx = currentRepo();
   if (!ctx || !listEl || !rowsEl || !spacerEl) return;
+  const s = strings();
   const now = Date.now();
 
   if (ui.visible.length === 0) {
     spacerEl.style.height = '0px';
     rowsEl.replaceChildren(
-      h('div', { class: 'no-results' }, ctx.repo.branches.length === 0 ? 'Este repositorio aún no tiene ramas.' : 'Ninguna rama coincide con el filtro.'),
+      h('div', { class: 'no-results' }, ctx.repo.branches.length === 0 ? s.noBranchesInRepo : s.noMatchingBranches),
     );
     rowsEl.style.transform = 'none';
     listEl.removeAttribute('aria-activedescendant');
@@ -791,8 +825,13 @@ function renderRow(
   }
 
   const right = h('span', { class: 'track' });
-  if (branch.ahead !== undefined && (branch.ahead > 0 || (branch.behind ?? 0) > 0)) {
-    right.append(h('span', { class: 'ahead' }, `↑${branch.ahead}`), h('span', { class: 'behind' }, `↓${branch.behind ?? 0}`));
+  const aheadCount = branch.ahead ?? 0;
+  const behindCount = branch.behind ?? 0;
+  if (aheadCount > 0) {
+    right.append(h('span', { class: 'ahead' }, `↑${aheadCount}`));
+  }
+  if (behindCount > 0) {
+    right.append(h('span', { class: 'behind' }, `↓${behindCount}`));
   }
 
   const actions = h('span', { class: 'row-actions' });
@@ -854,8 +893,8 @@ function renderRow(
     h(
       'div',
       { class: 'row-main' },
-      h('div', { class: 'row-title' }, h('span', { class: 'row-name' }, branch.name), tags),
-      h('div', { class: 'row-sub' }, `${branch.lastCommit.subject || '—'} · ${relativeTime(branch.lastCommit.date, now)}`),
+      h('div', { class: 'row-title' }, h('span', { class: 'row-name', title: branch.name }, branch.name), tags),
+      h('div', { class: 'row-sub' }, `${branch.lastCommit.subject || '—'} · ${relativeTime(branch.lastCommit.date, now, currentLocale())}`),
     ),
     right,
     actions,
