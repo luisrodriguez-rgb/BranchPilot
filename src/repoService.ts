@@ -62,9 +62,39 @@ export class RepoService implements vscode.Disposable {
     await this.refresh();
   }
 
-  async recentCommits(fullRef: string): Promise<CommitSummary[]> {
+  private requireRepo(): GitRepository {
     if (!this.repo) throw new Error('No hay repositorio abierto.');
-    return this.repo.recentCommits(fullRef);
+    return this.repo;
+  }
+
+  async recentCommits(fullRef: string): Promise<CommitSummary[]> {
+    return this.requireRepo().recentCommits(fullRef);
+  }
+
+  async checkout(refOrName: string): Promise<string> {
+    const target = await this.requireRepo().checkout(refOrName);
+    await this.refresh();
+    return target;
+  }
+
+  async createBranch(name: string, base?: string): Promise<void> {
+    await this.requireRepo().createBranch(name, base);
+    await this.refresh();
+  }
+
+  async renameBranch(oldName: string, newName: string): Promise<void> {
+    await this.requireRepo().renameBranch(oldName, newName);
+    await this.refresh();
+  }
+
+  async deleteBranch(name: string, force = false): Promise<void> {
+    await this.requireRepo().deleteBranch(name, force);
+    await this.refresh();
+  }
+
+  async stashPush(message?: string): Promise<void> {
+    await this.requireRepo().stashPush(message);
+    await this.refresh();
   }
 
   /** Refresca el estado; las llamadas simultáneas se agrupan en una sola ejecución extra. */

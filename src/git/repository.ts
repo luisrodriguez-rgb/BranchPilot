@@ -1,9 +1,10 @@
 import { access, stat } from 'node:fs/promises';
 import path from 'node:path';
+import { validateBranchName } from '../guards/branchGuards';
 import type { BranchInfo, CommitSummary, GitOperation, HeadInfo, RepoState, WorkingTreeStatus } from '../shared/types';
 import { COMMIT_LOG_FORMAT, branchFormat, parseBranches, parseCommits, parseStatus } from './parse';
 import type { GitRunner } from './runner';
-import { GitError, runGit } from './runner';
+import { GitError, runGit, runGitWrite } from './runner';
 
 const BASE_CANDIDATES = ['main', 'master', 'develop', 'trunk'];
 
@@ -22,16 +23,21 @@ export class GitRepository {
     readonly gitDir: string,
     readonly commonDir: string,
     private readonly run: GitRunner,
+    private readonly runWrite: GitRunner,
   ) {}
 
   /** Devuelve el repositorio que contiene `dir`, o `undefined` si no es un repo Git. */
-  static async open(dir: string, run: GitRunner = runGit): Promise<GitRepository | undefined> {
+  static async open(
+    dir: string,
+    run: GitRunner = runGit,
+    runWrite: GitRunner = run === runGit ? runGitWrite : run,
+  ): Promise<GitRepository | undefined> {
     try {
       const out = await run(dir, ['rev-parse', '--show-toplevel', '--absolute-git-dir', '--git-common-dir']);
       const [top, gitDir, commonDir] = out.split('\n').map((l) => l.trim());
       if (!top || !gitDir) return undefined;
       const common = commonDir ? path.resolve(dir, commonDir) : gitDir;
-      return new GitRepository(path.normalize(top), path.normalize(gitDir), common, run);
+      return new GitRepository(path.normalize(top), path.normalize(gitDir), common, run, runWrite);
     } catch {
       return undefined;
     }
@@ -129,6 +135,84 @@ export class GitRepository {
     if (!/^refs\/(heads|remotes)\//.test(fullRef)) throw new Error(`Referencia no válida: ${fullRef}`);
     const out = await this.run(this.root, ['log', `-n${Math.max(1, Math.floor(limit))}`, `--format=${COMMIT_LOG_FORMAT}`, fullRef, '--']);
     return parseCommits(out);
+  }
+
+  /**
+   * Cambia a una rama local o remota (`refs/heads/...` o `refs/remotes/...` o nombre de rama local).
+   * Si es una rama remota (`refs/remotes/<remote>/<name>`) y no existe localmente, crea la rama local
+   * siguiendo a la remota; si ya existe localmente, cambia a la local.
+   */
+  async checkout(refOrName: string): Promise<string> {
+    if (refOrName.startsWith('refs/heads/')) {
+      const localName = refOrName.slice('refs/heads/'.length);
+      const err = validateBranchName(localName);
+      if (err) throw new Error(err);
+      await this.runWrite(this.root, ['checkout', localName, '--']);
+      return localName;
+    }
+    if (refOrName.startsWith('refs/remotes/')) {
+      const remoteName = refOrName.slice('refs/remotes/'.length);
+      const slash = remoteName.indexOf('/');
+      const localName = slash >= 0 ? remoteName.slice(slash + 1) : remoteName;
+      const err = validateBranchName(localName);
+      if (err) throw new Error(err);
+      if (await this.localBranchExists(localName)) {
+        await this.runWrite(this.root, ['checkout', localName, '--']);
+      } else {
+        await this.runWrite(this.root, ['checkout', '--track', '-b', localName, refOrName, '--']);
+      }
+      return localName;
+    }
+    const err = validateBranchName(refOrName);
+    if (err) throw new Error(err);
+    await this.runWrite(this.root, ['checkout', refOrName, '--']);
+    return refOrName;
+  }
+
+  /** Crea una nueva rama a partir de `base` (o `HEAD` si no se indica) y cambia a ella. */
+  async createBranch(name: string, base?: string): Promise<void> {
+    const clean = name.trim();
+    const err = validateBranchName(clean);
+    if (err) throw new Error(err);
+    if (await this.localBranchExists(clean)) {
+      throw new Error(`Ya existe una rama local llamada «${clean}».`);
+    }
+    if (base) {
+      const baseClean = base.trim();
+      if (baseClean.startsWith('-')) throw new Error(`Rama base no válida: ${baseClean}`);
+      await this.runWrite(this.root, ['checkout', '-b', clean, baseClean, '--']);
+    } else {
+      await this.runWrite(this.root, ['checkout', '-b', clean]);
+    }
+  }
+
+  /** Renombra una rama local existente. */
+  async renameBranch(oldName: string, newName: string): Promise<void> {
+    const from = oldName.trim();
+    const to = newName.trim();
+    const errFrom = validateBranchName(from);
+    if (errFrom) throw new Error(errFrom);
+    const errTo = validateBranchName(to);
+    if (errTo) throw new Error(errTo);
+    if (await this.localBranchExists(to)) {
+      throw new Error(`Ya existe una rama local llamada «${to}».`);
+    }
+    await this.runWrite(this.root, ['branch', '-m', from, to]);
+  }
+
+  /** Elimina una rama local (`-d` por defecto, `-D` si `force` es `true`). */
+  async deleteBranch(name: string, force = false): Promise<void> {
+    const clean = name.trim();
+    const err = validateBranchName(clean);
+    if (err) throw new Error(err);
+    await this.runWrite(this.root, ['branch', force ? '-D' : '-d', '--', clean]);
+  }
+
+  /** Guarda los cambios actuales (incluyendo archivos sin seguimiento) en el stash. */
+  async stashPush(message?: string): Promise<void> {
+    const args = ['stash', 'push', '--include-untracked'];
+    if (message) args.push('-m', message);
+    await this.runWrite(this.root, args);
   }
 
   private async mergedRefs(baseBranch: string): Promise<Set<string>> {

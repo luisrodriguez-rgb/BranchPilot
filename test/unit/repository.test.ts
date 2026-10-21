@@ -117,6 +117,42 @@ describe('GitRepository', () => {
     await expect(r.recentCommits('HEAD')).rejects.toThrow('Referencia no válida');
   });
 
+  it('cambia de rama local y crea tracking al cambiar a una rama remota', async () => {
+    repo.git('checkout', '-b', 'feat/switch');
+    repo.commit('feat: switch');
+    repo.git('checkout', 'main');
+
+    const r = await open();
+    const target = await r.checkout('refs/heads/feat/switch');
+    expect(target).toBe('feat/switch');
+    expect((await r.head()).branch).toBe('feat/switch');
+  });
+
+  it('crea, renombra y elimina ramas locales de forma segura', async () => {
+    const r = await open();
+    await r.createBranch('feat/nueva', 'main');
+    expect((await r.head()).branch).toBe('feat/nueva');
+
+    repo.commit('feat: trabajo en nueva');
+    await r.renameBranch('feat/nueva', 'feat/renombrada');
+    expect((await r.head()).branch).toBe('feat/renombrada');
+
+    await r.checkout('main');
+    await expect(r.deleteBranch('feat/renombrada', false)).rejects.toThrow();
+    await r.deleteBranch('feat/renombrada', true);
+
+    const names = (await r.listBranches('main')).map((b) => b.name);
+    expect(names).not.toContain('feat/renombrada');
+  });
+
+  it('guarda cambios sin seguimiento en el stash con stashPush', async () => {
+    repo.write('untracked.txt', 'temporal');
+    const r = await open();
+    expect((await r.workingTree()).untracked).toBe(1);
+    await r.stashPush('BranchPilot test stash');
+    expect((await r.workingTree()).untracked).toBe(0);
+  });
+
   it('lee 200 ramas rápidamente', async () => {
     const headRef = repo.git('rev-parse', 'HEAD').trim();
     const dir = path.join(repo.dir, '.git', 'refs', 'heads', 'bulk');
@@ -132,3 +168,4 @@ describe('GitRepository', () => {
     expect(elapsed).toBeLessThan(500);
   });
 });
+
