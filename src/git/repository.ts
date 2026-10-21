@@ -1,7 +1,7 @@
 import { access, stat } from 'node:fs/promises';
 import path from 'node:path';
-import type { BranchInfo, GitOperation, HeadInfo, RepoState, WorkingTreeStatus } from '../shared/types';
-import { branchFormat, parseBranches, parseStatus } from './parse';
+import type { BranchInfo, CommitSummary, GitOperation, HeadInfo, RepoState, WorkingTreeStatus } from '../shared/types';
+import { COMMIT_LOG_FORMAT, branchFormat, parseBranches, parseCommits, parseStatus } from './parse';
 import type { GitRunner } from './runner';
 import { GitError, runGit } from './runner';
 
@@ -119,6 +119,16 @@ export class GitRepository {
       }
     }
     return branches;
+  }
+
+  /**
+   * Últimos commits de una rama. `fullRef` debe ser una ref completa (`refs/heads/...`
+   * o `refs/remotes/...`); cualquier otra cosa se rechaza para no pasar opciones a git.
+   */
+  async recentCommits(fullRef: string, limit = 15): Promise<CommitSummary[]> {
+    if (!/^refs\/(heads|remotes)\//.test(fullRef)) throw new Error(`Referencia no válida: ${fullRef}`);
+    const out = await this.run(this.root, ['log', `-n${Math.max(1, Math.floor(limit))}`, `--format=${COMMIT_LOG_FORMAT}`, fullRef, '--']);
+    return parseCommits(out);
   }
 
   private async mergedRefs(baseBranch: string): Promise<Set<string>> {

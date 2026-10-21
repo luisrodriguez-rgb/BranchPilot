@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseBranchLine, parseBranches, parseStatus } from '../../src/git/parse';
+import { parseBranchLine, parseBranches, parseCommits, parseStatus } from '../../src/git/parse';
 
 const SEP = '\x1f';
 const line = (...f: string[]): string => f.join(SEP);
@@ -34,6 +34,19 @@ describe('parseBranchLine', () => {
   it('soporta asuntos con caracteres especiales', () => {
     const b = parseBranchLine(line('refs/heads/x', 'a', '1', 'Ñandú', '<b>"hola"</b> & más', '', ' '), false);
     expect(b?.lastCommit.subject).toBe('<b>"hola"</b> & más');
+  });
+});
+
+describe('parseCommits', () => {
+  it('interpreta commits y conserva separadores dentro del asunto', () => {
+    const out = `${line('abc123', 'Ana', '1700000000', 'feat: a')}\n\n${line('def456', 'Luis', '1600000000', 'fix: b', 'extra')}\n`;
+    expect(parseCommits(out)).toEqual([
+      { hash: 'abc123', author: 'Ana', date: 1700000000, subject: 'feat: a' },
+      { hash: 'def456', author: 'Luis', date: 1600000000, subject: `fix: b${SEP}extra` },
+    ]);
+  });
+  it('ignora líneas incompletas', () => {
+    expect(parseCommits('abc')).toEqual([]);
   });
 });
 

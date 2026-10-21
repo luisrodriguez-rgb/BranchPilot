@@ -3,7 +3,7 @@ import { GitRepository } from './git/repository';
 import { watchGitDir } from './git/watcher';
 import type { Disposable } from './git/watcher';
 import { debounce } from './shared/debounce';
-import type { RepoState } from './shared/types';
+import type { CommitSummary, RepoState } from './shared/types';
 
 /**
  * Mantiene el estado del repositorio del workspace y avisa de cambios.
@@ -60,6 +60,11 @@ export class RepoService implements vscode.Disposable {
     this.current = undefined;
     if (next) this.watcher = watchGitDir(next.gitDir, () => this.scheduleRefresh());
     await this.refresh();
+  }
+
+  async recentCommits(fullRef: string): Promise<CommitSummary[]> {
+    if (!this.repo) throw new Error('No hay repositorio abierto.');
+    return this.repo.recentCommits(fullRef);
   }
 
   /** Refresca el estado; las llamadas simultáneas se agrupan en una sola ejecución extra. */

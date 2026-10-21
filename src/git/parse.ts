@@ -1,8 +1,27 @@
-import type { BranchInfo, WorkingTreeStatus } from '../shared/types';
+import type { BranchInfo, CommitSummary, WorkingTreeStatus } from '../shared/types';
 
 const SEP = '\x1f';
 const LOCAL_PREFIX = 'refs/heads/';
 const REMOTE_PREFIX = 'refs/remotes/';
+
+/** Formato de `git log`: hash corto, autor, fecha UNIX y asunto separados por `%1f`. */
+export const COMMIT_LOG_FORMAT = '%h%x1f%an%x1f%ct%x1f%s';
+
+export function parseCommits(output: string): CommitSummary[] {
+  const commits: CommitSummary[] = [];
+  for (const line of output.split('\n')) {
+    if (!line) continue;
+    const [hash, author, date, ...subject] = line.split(SEP);
+    if (!hash || date === undefined) continue;
+    commits.push({
+      hash,
+      author: author ?? '',
+      date: Number.parseInt(date, 10) || 0,
+      subject: subject.join(SEP),
+    });
+  }
+  return commits;
+}
 
 /** Campos de `for-each-ref`; `%1f` es el separador de unidad. */
 export function branchFormat(aheadBehindBase?: string): string {

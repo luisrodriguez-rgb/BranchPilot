@@ -100,6 +100,23 @@ describe('GitRepository', () => {
     }
   });
 
+  it('lista los últimos commits de una rama, del más reciente al más antiguo', async () => {
+    repo.git('checkout', '-b', 'feat/log');
+    repo.commit('feat: uno');
+    repo.commit('feat: dos');
+    const r = await open();
+    const commits = await r.recentCommits('refs/heads/feat/log', 2);
+    expect(commits.map((c) => c.subject)).toEqual(['feat: dos', 'feat: uno']);
+    expect(commits[0]).toMatchObject({ author: 'Test User' });
+    expect(commits[0]?.hash).toMatch(/^[0-9a-f]+$/);
+  });
+
+  it('rechaza referencias que no son ramas completas', async () => {
+    const r = await open();
+    await expect(r.recentCommits('--output=/tmp/x')).rejects.toThrow('Referencia no válida');
+    await expect(r.recentCommits('HEAD')).rejects.toThrow('Referencia no válida');
+  });
+
   it('lee 200 ramas rápidamente', async () => {
     const headRef = repo.git('rev-parse', 'HEAD').trim();
     const dir = path.join(repo.dir, '.git', 'refs', 'heads', 'bulk');
