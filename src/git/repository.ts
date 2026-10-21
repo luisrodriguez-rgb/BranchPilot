@@ -259,6 +259,15 @@ export class GitRepository {
     }
   }
 
+  /** Añade todos los cambios y realiza un commit con el mensaje indicado. */
+  async commitAll(message: string): Promise<string> {
+    const cleanMsg = message.trim();
+    if (!cleanMsg) throw new Error('El mensaje de commit no puede estar vacío.');
+    await this.runWrite(this.root, ['add', '-A']);
+    await this.runWrite(this.root, ['commit', '-m', cleanMsg]);
+    return this.resolveRefSha('HEAD');
+  }
+
   /** Guarda los cambios actuales (incluyendo archivos sin seguimiento) en el stash. */
   async stashPush(message?: string): Promise<void> {
     const args = ['stash', 'push', '--include-untracked'];

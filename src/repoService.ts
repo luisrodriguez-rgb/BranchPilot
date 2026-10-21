@@ -142,6 +142,12 @@ export class RepoService implements vscode.Disposable {
     return this.requireRepo().recentReflog(limit);
   }
 
+  async quickCommit(message: string): Promise<string> {
+    const sha = await this.requireRepo().commitAll(message);
+    await this.refresh();
+    return sha;
+  }
+
   async stashPush(message?: string): Promise<void> {
     await this.requireRepo().stashPush(message);
     await this.refresh();

@@ -187,5 +187,15 @@ describe('GitRepository', () => {
     expect(state.branches.length).toBe(201);
     expect(elapsed).toBeLessThan(500);
   });
+
+  it('hace commitAll correctamente de archivos modificados y sin seguimiento', async () => {
+    const r = await open();
+    writeFileSync(path.join(repo.dir, 'new-file.txt'), 'hola');
+    const sha = await r.commitAll('feat: archivo nuevo');
+    expect(sha).toMatch(/^[0-9a-f]{40}$/);
+    const wt = await r.workingTree();
+    expect(wt.unstaged).toBe(0);
+    expect(wt.untracked).toBe(0);
+  });
 });
 
