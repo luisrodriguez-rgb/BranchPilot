@@ -164,16 +164,31 @@ flowchart LR
 - **Acoplamiento Nativo en Source Control ([`package.json`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/package.json#L54-L61) y [`src/extension.ts`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/src/extension.ts#L38)):**
   - Se registró la vista de BranchPilot en el contenedor `"views": { "scm": [...] }`, permitiendo abrirla y organizarla dentro de la misma pestaña de Source Control junto a Cambios y Commits, además de mantener su acceso independiente en la barra de actividad.
 
+### Fase 13 · Pulido Quirúrgico de UX sobre Repositorio Real (`Papa_Bullet`)
+
+- **A. Eliminación total de "Spanglish" en Fechas Relativas, Resúmenes y HoverCard ([`src/shared/time.ts`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/src/shared/time.ts), [`src/shared/branchSummary.ts`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/src/shared/branchSummary.ts) y [`src/ui/branchPanel/webview/hoverCard.ts`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/src/ui/branchPanel/webview/hoverCard.ts)):**
+  - [`relativeTime`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/src/shared/time.ts#L22-L35) y [`shortRelativeTime`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/src/shared/time.ts#L38-L41) ahora reciben `locale: Locale = 'es'`, formateando `just now`, `2 minutes ago`, `10 days ago`, `2 months ago` cuando el IDE está en inglés, y `hace un momento`, `hace 10 días` en español.
+  - Se eliminaron mezclas como `Remotes updated hace 2 minutos (last fetch).` en el pie de página y `hace 10 días` en las subtítulos de fila.
+  - [`divergenceText`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/src/shared/branchSummary.ts#L7-L32), [`integrationText`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/src/shared/branchSummary.ts#L34-L40) y la tarjeta emergente [`HoverCard`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/src/ui/branchPanel/webview/hoverCard.ts#L28-L175) ahora respetan íntegramente el idioma activo del IDE.
+- **B. Supresión de Ruido Visual `↑0` en Filas de Rama ([`src/ui/branchPanel/webview/main.ts`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/src/ui/branchPanel/webview/main.ts#L814-L822) y [`media/webview.css`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/media/webview.css#L583-L600)):**
+  - En las filas de la lista de ramas (`renderRow`), ahora solo se pinta `↑X` en verde cuando `ahead > 0` y `↓Y` en naranja cuando `behind > 0`. Si una rama está únicamente por detrás de `main` (`ahead === 0, behind === 16`), la columna derecha muestra limpiamente `↓16` sin el falso indicador verde `↑0`.
+  - En la cabecera `Versus main`, cualquier contador en cero usa la clase `.zero` (`opacity: 0.4; color: var(--bp-muted)`).
+- **C. Jerarquía Visual Coherente de Botones sobre Ramas Protegidas ([`src/ui/branchPanel/webview/main.ts`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/src/ui/branchPanel/webview/main.ts#L408-L456) y [`media/webview.css`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/media/webview.css#L287-L355)):**
+  - Cuando el usuario está sobre una rama protegida (`main`) con cambios pendientes, la barra de commit rápido y su botón adoptan la variante `.caution` (borde y texto ámbar secundario: `Commit to main` / `Commit en main`), cediendo el protagonismo visual al botón primario azul **`+ Task branch`** y al botón de rescate **`→ Move changes to task branch...`**.
+- **D. Truncado Limpio (`ellipsis`) en Nombres Largos de Rama ([`media/webview.css`](file:///Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/media/webview.css#L510-L545)):**
+  - Se ajustó `.row-name` (`flex: 0 1 auto; min-width: 0; max-width: 65%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap`) y `.row-main` (`padding-right: 10px`) para que ramas con nombres largos (`origin/fix/badmergeybadalvaro`) se corten con `...` dejando siempre espacio respirable para los badges `[remote] [merged]` y la columna de divergencia `↓28`.
+
 ---
 
 ## 4. Métricas de Calidad y Paquete `.vsix`
 
-- **Pruebas:** `15 passed` suites de test (**`91 passed` tests unitarios**, de integración, carga y guards).
+- **Pruebas:** `15 passed` suites de test (**`93 passed` tests unitarios**, de integración, carga y guards).
 - **Tipado & Lint:** TypeScript `strict` y ESLint con **0 errores y 0 advertencias**.
 - **Tamaño de los bundles compilados (`npm run build`):**
   - `dist/extension.js`: **59.2 KB** (límite en `CONSTRAINTS.md`: `< 500 KB`).
-  - `dist/webview.js`: **29.7 KB**.
+  - `dist/webview.js`: **31.8 KB**.
   - `dist/cli.js`: **14.1 KB**.
 - **Empaquetado `.vsix` limpio de producción (`npm run package`):**
-  - Archivo generado: `/Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/branchpilot-0.1.0.vsix` (**51.92 KB**, 13 archivos esenciales).
+  - Archivo generado: `/Users/leonfeliperodriguez/Desktop/Trabajos/BranchPilot/branchpilot-0.1.0.vsix` (**52.62 KB**, 13 archivos esenciales).
   - Instalado y validado en **Visual Studio Code** y **Antigravity IDE**.
+
