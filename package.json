@@ -84,6 +84,18 @@
       {
         "command": "branchpilot.setupAgentRules",
         "title": "BranchPilot: Configurar reglas para agentes de IA (AGENTS.md)…"
+      },
+      {
+        "command": "branchpilot.createWorktree",
+        "title": "BranchPilot: Crear worktree paralelo…"
+      },
+      {
+        "command": "branchpilot.openWorktree",
+        "title": "BranchPilot: Abrir worktree en nueva ventana…"
+      },
+      {
+        "command": "branchpilot.removeWorktree",
+        "title": "BranchPilot: Quitar worktree secundario…"
       }
     ],
     "configuration": {

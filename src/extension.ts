@@ -4,7 +4,10 @@ import {
   CHECKOUT_COMMAND,
   CREATE_BRANCH_COMMAND,
   CREATE_TASK_BRANCH_COMMAND,
+  CREATE_WORKTREE_COMMAND,
   DELETE_BRANCH_COMMAND,
+  OPEN_WORKTREE_COMMAND,
+  REMOVE_WORKTREE_COMMAND,
   RENAME_BRANCH_COMMAND,
   SETUP_AGENT_RULES_COMMAND,
   VERIFY_TASK_BRANCH_COMMAND,
@@ -35,6 +38,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand(CREATE_TASK_BRANCH_COMMAND, () => actions.createTaskBranch()),
     vscode.commands.registerCommand(VERIFY_TASK_BRANCH_COMMAND, () => actions.verifyBranchForTask()),
     vscode.commands.registerCommand(SETUP_AGENT_RULES_COMMAND, () => actions.setupAgentRules()),
+    vscode.commands.registerCommand(CREATE_WORKTREE_COMMAND, (ref?: string) => actions.createWorktree(ref)),
+    vscode.commands.registerCommand(OPEN_WORKTREE_COMMAND, (wtPath?: string) => actions.openWorktree(wtPath)),
+    vscode.commands.registerCommand(REMOVE_WORKTREE_COMMAND, (wtPath?: string) => actions.removeWorktree(wtPath)),
   );
 
   await repos.start();
@@ -43,5 +49,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 export function deactivate(): void {
   // los recursos se liberan mediante context.subscriptions
 }
+
 
 

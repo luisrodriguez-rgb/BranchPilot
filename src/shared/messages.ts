@@ -20,11 +20,14 @@ export type FromWebview =
   | { type: 'deleteBranch'; ref: string }
   | { type: 'createTaskBranch' }
   | { type: 'verifyBranchForTask' }
-  | { type: 'setupAgentRules' };
+  | { type: 'setupAgentRules' }
+  | { type: 'createWorktree'; ref?: string }
+  | { type: 'openWorktree'; path: string }
+  | { type: 'removeWorktree'; path: string };
 
 export function isFromWebview(value: unknown): value is FromWebview {
   if (typeof value !== 'object' || value === null) return false;
-  const message = value as { type?: unknown; ref?: unknown; base?: unknown };
+  const message = value as { type?: unknown; ref?: unknown; base?: unknown; path?: unknown };
   switch (message.type) {
     case 'ready':
     case 'refresh':
@@ -39,9 +42,15 @@ export function isFromWebview(value: unknown): value is FromWebview {
       return typeof message.ref === 'string' && message.ref.length > 0;
     case 'createBranch':
       return message.base === undefined || typeof message.base === 'string';
+    case 'createWorktree':
+      return message.ref === undefined || typeof message.ref === 'string';
+    case 'openWorktree':
+    case 'removeWorktree':
+      return typeof message.path === 'string' && message.path.length > 0;
     default:
       return false;
   }
 }
+
 
 

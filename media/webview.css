@@ -202,6 +202,98 @@ body {
   background: var(--vscode-button-hoverBackground);
 }
 
+/* ---- Worktrees paralelos ---- */
+.worktrees {
+  flex: none;
+  padding: 6px 10px;
+  border: 1px solid var(--bp-border);
+  border-radius: var(--bp-radius);
+  background: color-mix(in srgb, var(--bp-blue) 6%, transparent);
+}
+
+.wt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.wt-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bp-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.wt-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  color: var(--bp-blue);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--bp-blue) 45%, transparent);
+  border-radius: 5px;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.wt-add-btn:hover {
+  background: color-mix(in srgb, var(--bp-blue) 14%, transparent);
+}
+
+.wt-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.wt-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--vscode-editor-background, transparent) 50%, transparent);
+}
+
+.wt-icon {
+  color: var(--bp-blue);
+}
+
+.wt-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.wt-branch {
+  font-size: 12px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wt-folder {
+  font-size: 11px;
+  color: var(--bp-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wt-item-actions {
+  display: inline-flex;
+  gap: 2px;
+}
+
+
 
 /* ---- Buscador y filtros ---- */
 .toolbar {
@@ -421,6 +513,11 @@ button:focus-visible,
 .tag.current-tag {
   color: var(--bp-green);
   border-color: color-mix(in srgb, var(--bp-green) 55%, transparent);
+}
+
+.tag.worktree-tag {
+  color: var(--bp-blue);
+  border-color: color-mix(in srgb, var(--bp-blue) 55%, transparent);
 }
 
 .tag.merged {

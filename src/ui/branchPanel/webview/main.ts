@@ -44,6 +44,8 @@ const ICON_EDIT =
   '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.2 2.5 13.5 4.8 5.5 12.8 2.5 13.5 3.2 10.5Z"/></svg>';
 const ICON_TRASH =
   '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4.5h10"/><path d="M6 4.5V3h4v1.5"/><path d="M4.5 4.5 5.2 13h5.6l.7-8.5"/></svg>';
+const ICON_WINDOW =
+  '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6h12"/></svg>';
 
 const saved = vscode.getState();
 const ui = {
@@ -73,6 +75,7 @@ let spacerEl: HTMLElement | undefined;
 let chipsEl: HTMLElement | undefined;
 let summaryEl: HTMLElement | undefined;
 let headerEl: HTMLElement | undefined;
+let worktreesEl: HTMLElement | undefined;
 let footerEl: HTMLElement | undefined;
 let builtFor: 'empty' | 'repo' | undefined;
 
@@ -131,6 +134,7 @@ function buildShell(): void {
   refresh.addEventListener('click', () => vscode.postMessage({ type: 'refresh' }));
 
   headerEl = h('section', { class: 'current', 'aria-label': 'Rama actual' });
+  worktreesEl = h('section', { class: 'worktrees', 'aria-label': 'Worktrees activos' });
   chipsEl = h('div', { class: 'chips', role: 'tablist', 'aria-label': 'Filtros de ramas' });
   summaryEl = h('div', { class: 'summary', role: 'status' });
   spacerEl = h('div', { class: 'spacer' });
@@ -148,6 +152,7 @@ function buildShell(): void {
 
   app.append(
     headerEl,
+    worktreesEl,
     h('div', { class: 'toolbar' }, searchInput, createBtn, refresh),
     chipsEl,
     summaryEl,
@@ -340,6 +345,77 @@ function renderHeader(repo: RepoState, protectedNow: boolean): void {
   headerEl.replaceChildren(...sections);
 }
 
+function folderBasename(p: string): string {
+  const parts = p.replace(/\\/g, '/').split('/').filter(Boolean);
+  return parts[parts.length - 1] ?? p;
+}
+
+function renderWorktrees(repo: RepoState): void {
+  if (!worktreesEl) return;
+  const secondary = repo.worktrees.filter((w) => !w.isCurrent);
+  const addBtn = h(
+    'button',
+    {
+      class: 'wt-add-btn',
+      type: 'button',
+      title: 'Crear un worktree en una carpeta paralela para otro agente',
+    },
+    icon(ICON_PLUS, 'icon'),
+    h('span', {}, 'Worktree paralelo'),
+  );
+  addBtn.addEventListener('click', () => {
+    card.hide();
+    vscode.postMessage({ type: 'createWorktree' });
+  });
+
+  const top = h(
+    'div',
+    { class: 'wt-header' },
+    h('span', { class: 'wt-title' }, `Worktrees (${repo.worktrees.length || 1})`),
+    addBtn,
+  );
+
+  if (secondary.length === 0) {
+    worktreesEl.replaceChildren(top);
+    return;
+  }
+
+  const list = h('div', { class: 'wt-list' });
+  for (const wt of secondary) {
+    const label = wt.branch ?? `HEAD (${wt.head})`;
+    const folder = folderBasename(wt.path);
+    const openBtn = makeRowAction(ICON_WINDOW, `Abrir worktree ${folder} en nueva ventana`, () =>
+      vscode.postMessage({ type: 'openWorktree', path: wt.path }),
+    );
+    const itemActions = h('span', { class: 'wt-item-actions' }, openBtn);
+    if (!wt.isMain) {
+      itemActions.append(
+        makeRowAction(
+          ICON_TRASH,
+          `Quitar worktree ${folder}`,
+          () => vscode.postMessage({ type: 'removeWorktree', path: wt.path }),
+          true,
+        ),
+      );
+    }
+    list.append(
+      h(
+        'div',
+        { class: 'wt-item', title: wt.path },
+        icon(ICON_WINDOW, 'icon wt-icon'),
+        h(
+          'div',
+          { class: 'wt-info' },
+          h('span', { class: 'wt-branch' }, label),
+          h('span', { class: 'wt-folder' }, folder),
+        ),
+        itemActions,
+      ),
+    );
+  }
+  worktreesEl.replaceChildren(top, list);
+}
+
 function renderChips(counts: Record<FilterId, number>): void {
   if (!chipsEl) return;
   chipsEl.replaceChildren(
@@ -421,7 +497,7 @@ function renderRows(): void {
     const selected = branch.fullRef === ui.selectedRef;
     const id = `opt-${i}`;
     if (selected) activeId = id;
-    fragment.append(renderRow(branch, i, selected, id, ctx.repo.baseBranch, ctx.protectedBranches, now));
+    fragment.append(renderRow(branch, i, selected, id, ctx.repo, ctx.protectedBranches, now));
   }
   rowsEl.replaceChildren(fragment);
   if (activeId) listEl.setAttribute('aria-activedescendant', activeId);
@@ -450,13 +526,22 @@ function renderRow(
   index: number,
   selected: boolean,
   id: string,
-  baseBranch: string | undefined,
+  repo: RepoState,
   protectedBranches: string[],
   now: number,
 ): HTMLElement {
+  const { baseBranch } = repo;
+  const linkedWorktree =
+    branch.kind === 'local' ? repo.worktrees.find((w) => !w.isCurrent && w.branch === branch.name) : undefined;
+
   const tags = h('span', { class: 'tags' });
   tags.append(h('span', { class: `tag ${branch.kind}` }, branch.kind === 'local' ? 'local' : 'remota'));
   if (branch.isCurrent) tags.append(h('span', { class: 'tag current-tag' }, 'actual'));
+  if (linkedWorktree) {
+    tags.append(
+      h('span', { class: 'tag worktree-tag', title: `Activa en worktree: ${linkedWorktree.path}` }, 'worktree'),
+    );
+  }
   if (branch.kind === 'local' && branch.name === baseBranch) tags.append(h('span', { class: 'tag base' }, 'base'));
   if (branch.merged) tags.append(h('span', { class: 'tag merged' }, 'fusionada'));
   if (branch.kind === 'local' && isListedProtected(branch.name, protectedBranches)) {
@@ -469,12 +554,25 @@ function renderRow(
   }
 
   const actions = h('span', { class: 'row-actions' });
-  if (!branch.isCurrent) {
+  if (linkedWorktree) {
+    actions.append(
+      makeRowAction(ICON_WINDOW, `Abrir worktree de ${branch.name} en nueva ventana`, () =>
+        vscode.postMessage({ type: 'openWorktree', path: linkedWorktree.path }),
+      ),
+    );
+  } else if (!branch.isCurrent) {
     actions.append(
       makeRowAction(ICON_SWITCH, `Cambiar a ${branch.name}`, () =>
         vscode.postMessage({ type: 'checkout', ref: branch.fullRef }),
       ),
     );
+    if (branch.kind === 'local') {
+      actions.append(
+        makeRowAction(ICON_WINDOW, `Crear worktree paralelo para ${branch.name}`, () =>
+          vscode.postMessage({ type: 'createWorktree', ref: branch.fullRef }),
+        ),
+      );
+    }
   }
   actions.append(
     makeRowAction(ICON_PLUS, `Nueva rama desde ${branch.name}`, () =>
@@ -487,7 +585,7 @@ function renderRow(
         vscode.postMessage({ type: 'renameBranch', ref: branch.fullRef }),
       ),
     );
-    if (!branch.isCurrent && branch.name !== baseBranch) {
+    if (!branch.isCurrent && !linkedWorktree && branch.name !== baseBranch) {
       actions.append(
         makeRowAction(
           ICON_TRASH,
@@ -529,7 +627,10 @@ function renderRow(
     if (fresh) card.scheduleShow(branch, fresh, baseBranch, true);
   });
   row.addEventListener('dblclick', () => {
-    if (!branch.isCurrent) {
+    if (linkedWorktree) {
+      card.hide();
+      vscode.postMessage({ type: 'openWorktree', path: linkedWorktree.path });
+    } else if (!branch.isCurrent) {
       card.hide();
       vscode.postMessage({ type: 'checkout', ref: branch.fullRef });
     }
@@ -553,6 +654,7 @@ function renderAll(resetScroll: boolean): void {
   const protectedNow =
     !ctx.repo.head.detached && !!ctx.repo.head.branch && isListedProtected(ctx.repo.head.branch, ctx.protectedBranches);
   renderHeader(ctx.repo, protectedNow);
+  renderWorktrees(ctx.repo);
   renderChips(countByFilter(ctx.repo.branches, now, ctx.staleDays));
   renderFooter(ctx.repo);
   renderList(resetScroll);

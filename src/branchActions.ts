@@ -16,6 +16,9 @@ export const DELETE_BRANCH_COMMAND = 'branchpilot.deleteBranch';
 export const CREATE_TASK_BRANCH_COMMAND = 'branchpilot.createTaskBranch';
 export const VERIFY_TASK_BRANCH_COMMAND = 'branchpilot.verifyBranchForTask';
 export const SETUP_AGENT_RULES_COMMAND = 'branchpilot.setupAgentRules';
+export const CREATE_WORKTREE_COMMAND = 'branchpilot.createWorktree';
+export const OPEN_WORKTREE_COMMAND = 'branchpilot.openWorktree';
+export const REMOVE_WORKTREE_COMMAND = 'branchpilot.removeWorktree';
 
 function formatGitFailure(error: unknown): string {
   if (error instanceof GitError && error.stderr.trim()) {
@@ -46,6 +49,7 @@ export class BranchActions {
       workingTree: state.workingTree,
       protection: readSettings().protection,
       baseBranch: state.baseBranch,
+      worktrees: state.worktrees,
     };
   }
 
@@ -440,6 +444,192 @@ export class BranchActions {
       );
     } catch (error) {
       void vscode.window.showErrorMessage(`No se pudo escribir ${targetPick.file}: ${formatGitFailure(error)}`);
+    }
+  }
+
+  /**
+   * Crea un nuevo worktree para trabajar en paralelo (p. ej. con otro agente en otra ventana)
+   * sin cambiar ni alterar la rama activa en la ventana actual.
+   */
+  async createWorktree(branchRefOrName?: string): Promise<void> {
+    await this.repos.refresh();
+    const state = this.requireState();
+    if (!state) return;
+
+    let newBranch: string | undefined;
+    let refOrBase: string | undefined;
+    let slugForFolder: string;
+
+    if (branchRefOrName) {
+      const found = state.branches.find((b) => b.fullRef === branchRefOrName || b.name === branchRefOrName);
+      const branchName = found ? found.name : branchRefOrName.replace(/^refs\/(heads|remotes)\//, '');
+      const busy = state.worktrees.find((w) => w.branch === branchName);
+      if (busy) {
+        const openOpt = 'Abrir en nueva ventana';
+        const pick = await vscode.window.showInformationMessage(
+          `La rama «${branchName}» ya tiene un worktree en «${busy.path}».`,
+          openOpt,
+        );
+        if (pick === openOpt) await this.openWorktree(busy.path);
+        return;
+      }
+      refOrBase = branchName;
+      slugForFolder = branchName.replace(/[^a-zA-Z0-9._-]+/g, '-');
+    } else {
+      const modePick = await vscode.window.showQuickPick(
+        [
+          {
+            label: '$(sparkle) Nueva rama de tarea en worktree paralelo',
+            description: 'Ideal para lanzar un segundo agente en otra ventana sin tocar esta rama',
+            mode: 'new' as const,
+          },
+          {
+            label: '$(git-branch) Rama existente en worktree paralelo',
+            description: 'Abre una rama local que no esté en uso en una carpeta hermana',
+            mode: 'existing' as const,
+          },
+        ],
+        {
+          title: 'Crear worktree paralelo',
+          placeHolder: '¿Quieres crear una rama nueva o usar una existente?',
+        },
+      );
+      if (!modePick) return;
+
+      if (modePick.mode === 'existing') {
+        const usedBranches = new Set(state.worktrees.map((w) => w.branch).filter(Boolean));
+        const available = state.branches.filter((b) => b.kind === 'local' && !usedBranches.has(b.name));
+        const picked = await this.pickBranch(available, 'Selecciona la rama local para el nuevo worktree');
+        if (!picked) return;
+        refOrBase = picked.name;
+        slugForFolder = picked.name.replace(/[^a-zA-Z0-9._-]+/g, '-');
+      } else {
+        const chosenBase = await this.pickBaseBranch(state);
+        if (!chosenBase) return;
+        const existingLocal = new Set(state.branches.filter((b) => b.kind === 'local').map((b) => b.name));
+        const rawName = await vscode.window.showInputBox({
+          title: `Nueva rama para worktree (base: ${chosenBase})`,
+          prompt: 'Introduce el nombre de la nueva rama o descripción corta',
+          placeHolder: 'feat/agente-paralelo',
+          ignoreFocusOut: true,
+          validateInput: (val) => {
+            const clean = val.trim();
+            const err = validateBranchName(clean);
+            if (err) return err;
+            if (existingLocal.has(clean)) return `Ya existe una rama local llamada «${clean}».`;
+            return undefined;
+          },
+        });
+        const cleanName = rawName?.trim();
+        if (!cleanName) return;
+        newBranch = cleanName;
+        refOrBase = chosenBase;
+        slugForFolder = cleanName.replace(/[^a-zA-Z0-9._-]+/g, '-');
+      }
+    }
+
+    const defaultDir = path.join(path.dirname(state.root), `${state.name}-${slugForFolder}`);
+    const targetInput = await vscode.window.showInputBox({
+      title: 'Carpeta destino del worktree',
+      prompt: 'Ruta donde se creará el árbol de trabajo paralelo',
+      value: defaultDir,
+      ignoreFocusOut: true,
+      validateInput: (val) => (!val.trim() ? 'La ruta no puede estar vacía.' : undefined),
+    });
+    const targetDir = targetInput?.trim();
+    if (!targetDir) return;
+
+    try {
+      const createdPath = await this.repos.addWorktree(targetDir, { newBranch, refOrBase });
+      const openOpt = 'Abrir en nueva ventana';
+      const choice = await vscode.window.showInformationMessage(
+        `BranchPilot: Worktree creado en «${createdPath}».`,
+        openOpt,
+      );
+      if (choice === openOpt) {
+        await this.openWorktree(createdPath);
+      }
+    } catch (error) {
+      void vscode.window.showErrorMessage(`No se pudo crear el worktree: ${formatGitFailure(error)}`);
+    }
+  }
+
+  /** Abre la carpeta de un worktree en una nueva ventana del IDE. */
+  async openWorktree(worktreePath?: string): Promise<void> {
+    await this.repos.refresh();
+    const state = this.requireState();
+    if (!state) return;
+
+    let targetPath = worktreePath;
+    if (!targetPath) {
+      const others = state.worktrees.filter((w) => !w.isCurrent);
+      if (others.length === 0) {
+        void vscode.window.showInformationMessage('BranchPilot: No hay otros worktrees creados para este repositorio.');
+        return;
+      }
+      const picked = await vscode.window.showQuickPick(
+        others.map((w) => ({
+          label: w.branch ?? `HEAD (${w.head})`,
+          description: w.path,
+          path: w.path,
+        })),
+        { placeHolder: 'Selecciona el worktree que deseas abrir en una nueva ventana' },
+      );
+      if (!picked) return;
+      targetPath = picked.path;
+    }
+
+    await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(targetPath), true);
+  }
+
+  /** Quita un worktree secundario previa confirmación del usuario. */
+  async removeWorktree(worktreePath?: string): Promise<void> {
+    await this.repos.refresh();
+    const state = this.requireState();
+    if (!state) return;
+
+    let target = worktreePath ? state.worktrees.find((w) => w.path === worktreePath) : undefined;
+    if (!target) {
+      const removable = state.worktrees.filter((w) => !w.isCurrent && !w.isMain);
+      if (removable.length === 0) {
+        void vscode.window.showInformationMessage('BranchPilot: No hay worktrees secundarios para quitar.');
+        return;
+      }
+      const picked = await vscode.window.showQuickPick(
+        removable.map((w) => ({
+          label: w.branch ?? `HEAD (${w.head})`,
+          description: w.path,
+          wt: w,
+        })),
+        { placeHolder: 'Selecciona el worktree secundario que deseas quitar' },
+      );
+      if (!picked) return;
+      target = picked.wt;
+    }
+
+    if (target.isCurrent || target.isMain) {
+      void vscode.window.showErrorMessage('BranchPilot: No se puede quitar el worktree principal ni el activo en esta ventana.');
+      return;
+    }
+
+    const confirmOpt = 'Quitar worktree';
+    const forceOpt = 'Forzar eliminación';
+    const choice = await vscode.window.showWarningMessage(
+      `¿Quitar el worktree «${target.path}» (${target.branch ?? target.head})?`,
+      {
+        modal: true,
+        detail: 'Se eliminará la carpeta del árbol de trabajo secundario (la rama y sus commits se conservan en el repositorio).',
+      },
+      confirmOpt,
+      forceOpt,
+    );
+    if (choice !== confirmOpt && choice !== forceOpt) return;
+
+    try {
+      await this.repos.removeWorktree(target.path, choice === forceOpt);
+      void vscode.window.setStatusBarMessage(`BranchPilot: Worktree «${target.path}» eliminado`, 4000);
+    } catch (error) {
+      void vscode.window.showErrorMessage(`No se pudo quitar el worktree: ${formatGitFailure(error)}`);
     }
   }
 }

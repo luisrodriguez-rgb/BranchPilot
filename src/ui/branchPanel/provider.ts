@@ -66,6 +66,15 @@ export class BranchPanelProvider implements vscode.WebviewViewProvider, vscode.D
         case 'setupAgentRules':
           void this.actions.setupAgentRules();
           break;
+        case 'createWorktree':
+          void this.actions.createWorktree(message.ref);
+          break;
+        case 'openWorktree':
+          void this.actions.openWorktree(message.path);
+          break;
+        case 'removeWorktree':
+          void this.actions.removeWorktree(message.path);
+          break;
       }
     });
     view.onDidChangeVisibility(() => {
