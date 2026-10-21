@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import type { BranchActions } from '../../branchActions';
 import type { RepoService } from '../../repoService';
 import { readSettings } from '../../settings';
+import { resolveLocale } from '../../shared/i18n';
 import { isFromWebview } from '../../shared/messages';
 import type { PanelState, ToWebview } from '../../shared/messages';
 import { randomBytes } from 'node:crypto';
@@ -57,6 +58,9 @@ export class BranchPanelProvider implements vscode.WebviewViewProvider, vscode.D
         case 'deleteBranch':
           void this.actions.deleteBranch(message.ref);
           break;
+        case 'undoLastAction':
+          void this.actions.undoLastBranchAction();
+          break;
         case 'createTaskBranch':
           void this.actions.createTaskBranch();
           break;
@@ -98,8 +102,9 @@ export class BranchPanelProvider implements vscode.WebviewViewProvider, vscode.D
   }
 
   private currentState(): PanelState {
+    const locale = resolveLocale(vscode.env.language);
     const repo = this.repos.state;
-    if (!repo) return { kind: 'empty' };
+    if (!repo) return { kind: 'empty', locale };
     const settings = readSettings();
     return {
       kind: 'repo',
@@ -107,6 +112,7 @@ export class BranchPanelProvider implements vscode.WebviewViewProvider, vscode.D
       repositories: this.repos.repositories,
       protection: settings.protection,
       staleDays: settings.staleDays,
+      locale,
     };
   }
 

@@ -14,6 +14,7 @@ import {
   RENAME_BRANCH_COMMAND,
   SETUP_AGENT_RULES_COMMAND,
   SWITCH_REPO_COMMAND,
+  UNDO_LAST_ACTION_COMMAND,
   VERIFY_TASK_BRANCH_COMMAND,
 } from './branchActions';
 import { RepoService } from './repoService';
@@ -42,6 +43,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand(CREATE_BRANCH_COMMAND, (base?: string) => actions.createBranch(base)),
     vscode.commands.registerCommand(RENAME_BRANCH_COMMAND, (ref?: string) => actions.renameBranch(ref)),
     vscode.commands.registerCommand(DELETE_BRANCH_COMMAND, (ref?: string) => actions.deleteBranch(ref)),
+    vscode.commands.registerCommand(UNDO_LAST_ACTION_COMMAND, () => actions.undoLastBranchAction()),
     vscode.commands.registerCommand(CREATE_TASK_BRANCH_COMMAND, () => actions.createTaskBranch()),
     vscode.commands.registerCommand(MOVE_DIRTY_TO_TASK_COMMAND, () => actions.moveDirtyToTaskBranch()),
     vscode.commands.registerCommand(VERIFY_TASK_BRANCH_COMMAND, () => actions.verifyBranchForTask()),

@@ -1,5 +1,7 @@
 import { countByFilter, filterBranches, sortBranches } from '../../../shared/filter';
 import type { FilterId } from '../../../shared/filter';
+import { getUiStrings } from '../../../shared/i18n';
+import type { UiStrings } from '../../../shared/i18n';
 import type { FromWebview, PanelState, ToWebview } from '../../../shared/messages';
 import { isListedProtected } from '../../../shared/protection';
 import { relativeTime } from '../../../shared/time';
@@ -25,18 +27,12 @@ declare function acquireVsCodeApi(): VsCodeApi;
 const vscode = acquireVsCodeApi();
 const ROW_HEIGHT = 54;
 
-const FILTERS: Array<{ id: FilterId; label: string }> = [
-  { id: 'all', label: 'Todas' },
-  { id: 'local', label: 'Locales' },
-  { id: 'remote', label: 'Remotas' },
-  { id: 'merged', label: 'Fusionadas' },
-  { id: 'stale', label: 'Antiguas' },
-];
-
 const ICON_BRANCH =
   '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="4" cy="3.5" r="1.6"/><circle cx="4" cy="12.5" r="1.6"/><circle cx="12" cy="6" r="1.6"/><path d="M4 5.1v5.8"/><path d="M12 7.6c0 2.6-3.2 2.6-7 4.4"/></svg>';
 const ICON_REFRESH =
   '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.7-4"/><path d="M13.5 2.5v3h-3"/></svg>';
+const ICON_UNDO =
+  '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h5.5a3.5 3.5 0 1 1 0 7H6"/><path d="M6.5 3.5 4 6l2.5 2.5"/></svg>';
 const ICON_PLUS =
   '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10"/><path d="M3 8h10"/></svg>';
 const ICON_SWITCH =
@@ -57,6 +53,10 @@ const ui = {
   panel: { kind: 'empty' } as PanelState,
   visible: [] as BranchInfo[],
 };
+
+function strings(): UiStrings {
+  return getUiStrings(ui.panel.locale ?? navigator.language);
+}
 
 function persist(): void {
   vscode.setState({ filter: ui.filter, query: ui.query, onlyActiveRepos: ui.onlyActiveRepos });
@@ -83,12 +83,13 @@ let footerEl: HTMLElement | undefined;
 let builtFor: 'empty' | 'repo' | undefined;
 
 function buildShell(): void {
+  const s = strings();
   app.replaceChildren();
   searchInput = h('input', {
     type: 'search',
     class: 'search',
-    placeholder: 'Buscar ramas…',
-    'aria-label': 'Buscar ramas',
+    placeholder: s.searchPlaceholder,
+    'aria-label': s.searchPlaceholder,
     spellcheck: 'false',
   });
   searchInput.value = ui.query;
@@ -120,24 +121,36 @@ function buildShell(): void {
       'aria-label': 'Crear nueva rama',
     },
     icon(ICON_PLUS, 'icon'),
-    h('span', {}, 'Nueva'),
+    h('span', {}, s.newBranchBtn),
   );
   createBtn.addEventListener('click', () => {
     card.hide();
     vscode.postMessage({ type: 'createBranch' });
   });
 
+  const undoBtn = h('button', {
+    class: 'icon-button',
+    type: 'button',
+    title: s.undoBtn,
+    'aria-label': s.undoBtn,
+  });
+  undoBtn.append(icon(ICON_UNDO, 'icon'));
+  undoBtn.addEventListener('click', () => {
+    card.hide();
+    vscode.postMessage({ type: 'undoLastAction' });
+  });
+
   const refresh = h('button', {
     class: 'icon-button',
     type: 'button',
-    title: 'Actualizar',
-    'aria-label': 'Actualizar ramas',
+    title: s.refreshBtnTitle,
+    'aria-label': s.refreshBtnTitle,
   });
   refresh.append(icon(ICON_REFRESH, 'icon'));
   refresh.addEventListener('click', () => vscode.postMessage({ type: 'refresh' }));
 
   reposEl = h('section', { class: 'repos-bar', 'aria-label': 'Repositorios del workspace', hidden: '' });
-  headerEl = h('section', { class: 'current', 'aria-label': 'Rama actual' });
+  headerEl = h('section', { class: 'current', 'aria-label': s.currentBranchEyebrow });
   worktreesEl = h('section', { class: 'worktrees', 'aria-label': 'Worktrees activos' });
   chipsEl = h('div', { class: 'chips', role: 'tablist', 'aria-label': 'Filtros de ramas' });
   summaryEl = h('div', { class: 'summary', role: 'status' });
@@ -158,7 +171,7 @@ function buildShell(): void {
     reposEl,
     headerEl,
     worktreesEl,
-    h('div', { class: 'toolbar' }, searchInput, createBtn, refresh),
+    h('div', { class: 'toolbar' }, searchInput, createBtn, undoBtn, refresh),
     chipsEl,
     summaryEl,
     listEl,
@@ -244,33 +257,35 @@ function moveSelection(index: number): void {
 }
 
 function renderEmpty(): void {
+  const s = strings();
   builtFor = 'empty';
   app.replaceChildren(
     h(
       'div',
       { class: 'empty' },
-      h('h2', {}, 'Sin repositorio Git'),
-      h('p', {}, 'Abre una carpeta que contenga un repositorio Git para ver sus ramas.'),
+      h('h2', {}, s.emptyTitle),
+      h('p', {}, s.emptyBody),
     ),
   );
 }
 
 function renderHeader(repo: RepoState, protectedNow: boolean): void {
   if (!headerEl) return;
+  const s = strings();
   const { head, workingTree: wt } = repo;
   const current = repo.branches.find((b) => b.isCurrent);
-  const name = head.detached ? `HEAD en ${head.shortHash ?? '—'}` : (head.branch ?? 'HEAD');
+  const name = head.detached ? `HEAD @ ${head.shortHash ?? '—'}` : (head.branch ?? 'HEAD');
 
   const badges = h('div', { class: 'badges' });
-  if (head.detached) badges.append(h('span', { class: 'badge warn' }, 'Desacoplado'));
-  if (protectedNow) badges.append(h('span', { class: 'badge warn' }, 'Protegida'));
-  if (wt.operation) badges.append(h('span', { class: 'badge warn' }, `Operación: ${wt.operation}`));
+  if (head.detached) badges.append(h('span', { class: 'badge warn' }, s.detachedBadge));
+  if (protectedNow) badges.append(h('span', { class: 'badge warn' }, s.protectedBadge));
+  if (wt.operation) badges.append(h('span', { class: 'badge warn' }, s.operationBadge(wt.operation)));
   badges.append(
     isDirty(wt)
-      ? h('span', { class: 'badge changes' }, `${wt.staged + wt.unstaged + wt.untracked + wt.conflicted} cambios`)
-      : h('span', { class: 'badge ok' }, 'Limpia'),
+      ? h('span', { class: 'badge changes' }, s.changesBadge(wt.staged + wt.unstaged + wt.untracked + wt.conflicted))
+      : h('span', { class: 'badge ok' }, s.cleanBadge),
   );
-  if (wt.conflicted > 0) badges.append(h('span', { class: 'badge danger' }, `${wt.conflicted} en conflicto`));
+  if (wt.conflicted > 0) badges.append(h('span', { class: 'badge danger' }, s.conflictsBadge(wt.conflicted)));
 
   const meta: Child[] = [];
   if (current) {
@@ -279,13 +294,13 @@ function renderHeader(repo: RepoState, protectedNow: boolean): void {
       ` ${current.lastCommit.subject} · ${relativeTime(current.lastCommit.date, Date.now())}`,
     );
   } else if (!head.detached) {
-    meta.push('Aún sin commits');
+    meta.push(s.noCommitsYet);
   }
 
   const base: Child[] = [];
   if (repo.baseBranch && current && current.name !== repo.baseBranch && current.ahead !== undefined) {
     base.push(
-      `Frente a ${repo.baseBranch}: `,
+      s.versusBase(repo.baseBranch),
       h('span', { class: 'ahead' }, `↑${current.ahead}`),
       ' ',
       h('span', { class: 'behind' }, `↓${current.behind ?? 0}`),
@@ -302,7 +317,7 @@ function renderHeader(repo: RepoState, protectedNow: boolean): void {
       title: 'Crear una rama nueva con nombre sugerido para tu próxima tarea con IA',
     },
     icon(ICON_PLUS, 'icon'),
-    h('span', {}, 'Rama para tarea'),
+    h('span', {}, s.taskBranchBtn),
   );
   taskBtn.addEventListener('click', () => {
     card.hide();
@@ -316,7 +331,7 @@ function renderHeader(repo: RepoState, protectedNow: boolean): void {
       type: 'button',
       title: 'Verificar si la rama actual es segura antes de delegar trabajo a un agente',
     },
-    h('span', {}, 'Pre-chequeo IA'),
+    h('span', {}, s.precheckBtn),
   );
   precheckBtn.addEventListener('click', () => {
     card.hide();
@@ -330,7 +345,7 @@ function renderHeader(repo: RepoState, protectedNow: boolean): void {
       type: 'button',
       title: 'Insertar regla de verificación de rama en AGENTS.md, .clinerules o .cursorrules',
     },
-    h('span', {}, 'AGENTS.md'),
+    h('span', {}, s.agentRulesBtn),
   );
   rulesBtn.addEventListener('click', () => {
     card.hide();
@@ -348,7 +363,7 @@ function renderHeader(repo: RepoState, protectedNow: boolean): void {
         title: 'Trasladar los cambios actuales sin guardar hacia una nueva rama de tarea',
       },
       icon(ICON_SWITCH, 'icon'),
-      h('span', {}, 'Mover cambios a rama de tarea…'),
+      h('span', {}, s.rescueDirtyBtn),
     );
     rescueBtn.addEventListener('click', () => {
       card.hide();
@@ -358,7 +373,7 @@ function renderHeader(repo: RepoState, protectedNow: boolean): void {
   }
 
   const sections: Node[] = [
-    h('div', { class: 'current-top' }, h('span', { class: 'eyebrow' }, 'Rama actual'), h('span', { class: 'repo-name' }, repo.name)),
+    h('div', { class: 'current-top' }, h('span', { class: 'eyebrow' }, s.currentBranchEyebrow), h('span', { class: 'repo-name' }, repo.name)),
     h('div', { class: 'current-name' }, icon(ICON_BRANCH, 'icon'), h('span', { class: 'name-text', title: name }, name)),
     badges,
   ];
@@ -375,6 +390,7 @@ function folderBasename(p: string): string {
 
 function renderWorktrees(repo: RepoState): void {
   if (!worktreesEl) return;
+  const s = strings();
   const secondary = repo.worktrees.filter((w) => !w.isCurrent);
   const addBtn = h(
     'button',
@@ -384,7 +400,7 @@ function renderWorktrees(repo: RepoState): void {
       title: 'Crear un worktree en una carpeta paralela para otro agente',
     },
     icon(ICON_PLUS, 'icon'),
-    h('span', {}, 'Worktree paralelo'),
+    h('span', {}, s.addWorktreeBtn),
   );
   addBtn.addEventListener('click', () => {
     card.hide();
@@ -394,7 +410,7 @@ function renderWorktrees(repo: RepoState): void {
   const top = h(
     'div',
     { class: 'wt-header' },
-    h('span', { class: 'wt-title' }, `Worktrees (${repo.worktrees.length || 1})`),
+    h('span', { class: 'wt-title' }, s.worktreesTitle(repo.worktrees.length || 1)),
     addBtn,
   );
 
@@ -441,8 +457,16 @@ function renderWorktrees(repo: RepoState): void {
 
 function renderChips(counts: Record<FilterId, number>): void {
   if (!chipsEl) return;
+  const s = strings();
+  const filters: Array<{ id: FilterId; label: string }> = [
+    { id: 'all', label: s.filterAll },
+    { id: 'local', label: s.filterLocal },
+    { id: 'remote', label: s.filterRemote },
+    { id: 'merged', label: s.filterMerged },
+    { id: 'stale', label: s.filterStale },
+  ];
   chipsEl.replaceChildren(
-    ...FILTERS.map((f) => {
+    ...filters.map((f) => {
       const active = f.id === ui.filter;
       const chip = h(
         'button',
@@ -467,6 +491,7 @@ function hasPendingActivity(r: RepoOverview): boolean {
 
 function renderRepos(repositories: RepoOverview[]): void {
   if (!reposEl) return;
+  const s = strings();
   if (repositories.length <= 1) {
     reposEl.hidden = true;
     reposEl.replaceChildren();
@@ -486,7 +511,7 @@ function renderRepos(repositories: RepoOverview[]): void {
       type: 'button',
       title: 'Filtrar repositorios con cambios sin guardar, ramas sin fusionar o worktrees paralelos',
     },
-    ui.onlyActiveRepos ? `Con actividad (${activeCount})` : `Filtrar activos (${activeCount}/${repositories.length})`,
+    s.filterActiveRepos(activeCount, repositories.length, ui.onlyActiveRepos),
   );
   filterToggle.addEventListener('click', () => {
     ui.onlyActiveRepos = !ui.onlyActiveRepos;
@@ -497,7 +522,7 @@ function renderRepos(repositories: RepoOverview[]): void {
   const top = h(
     'div',
     { class: 'repos-header' },
-    h('span', { class: 'repos-title' }, `Radar Multi-Repo (${repositories.length})`),
+    h('span', { class: 'repos-title' }, s.radarTitle(repositories.length)),
     filterToggle,
   );
 
@@ -578,6 +603,7 @@ function currentRepo():
 function renderList(resetScroll: boolean): void {
   const ctx = currentRepo();
   if (!ctx || !listEl || !summaryEl) return;
+  const s = strings();
   const now = Date.now();
   ui.visible = sortBranches(
     filterBranches(ctx.repo.branches, { filter: ui.filter, query: ui.query, nowMs: now, staleDays: ctx.staleDays }),
@@ -587,8 +613,7 @@ function renderList(resetScroll: boolean): void {
   if (resetScroll) listEl.scrollTop = 0;
 
   const total = ctx.repo.branches.length;
-  summaryEl.textContent =
-    ui.visible.length === total ? `${total} ramas` : `${ui.visible.length} de ${total} ramas`;
+  summaryEl.textContent = s.branchesCount(ui.visible.length, total);
   renderRows();
 }
 

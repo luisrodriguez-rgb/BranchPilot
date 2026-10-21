@@ -1,7 +1,7 @@
 {
   "name": "branchpilot",
   "displayName": "BranchPilot",
-  "description": "Control visual de ramas de Git para el desarrollo asistido por IA: sabe siempre en qué rama estás.",
+  "description": "%branchpilot.description%",
   "version": "0.1.0",
   "publisher": "luisrodriguez-rgb",
   "license": "MIT",
@@ -47,74 +47,78 @@
         {
           "type": "webview",
           "id": "branchpilot.panel",
-          "name": "Ramas"
+          "name": "%branchpilot.view.branches%"
         }
       ]
     },
     "commands": [
       {
         "command": "branchpilot.refresh",
-        "title": "BranchPilot: Actualizar ramas"
+        "title": "%branchpilot.command.refresh%"
       },
       {
         "command": "branchpilot.focusPanel",
-        "title": "BranchPilot: Mostrar panel de ramas"
+        "title": "%branchpilot.command.focusPanel%"
       },
       {
         "command": "branchpilot.checkout",
-        "title": "BranchPilot: Cambiar de rama…"
+        "title": "%branchpilot.command.checkout%"
       },
       {
         "command": "branchpilot.createBranch",
-        "title": "BranchPilot: Crear nueva rama…"
+        "title": "%branchpilot.command.createBranch%"
       },
       {
         "command": "branchpilot.renameBranch",
-        "title": "BranchPilot: Renombrar rama…"
+        "title": "%branchpilot.command.renameBranch%"
       },
       {
         "command": "branchpilot.deleteBranch",
-        "title": "BranchPilot: Eliminar rama local…"
+        "title": "%branchpilot.command.deleteBranch%"
+      },
+      {
+        "command": "branchpilot.undoLastBranchAction",
+        "title": "%branchpilot.command.undoLastBranchAction%"
       },
       {
         "command": "branchpilot.createTaskBranch",
-        "title": "BranchPilot: Crear rama para esta tarea (IA)…"
+        "title": "%branchpilot.command.createTaskBranch%"
       },
       {
         "command": "branchpilot.moveDirtyToTaskBranch",
-        "title": "BranchPilot: Mover cambios sin guardar a una nueva rama de tarea…"
+        "title": "%branchpilot.command.moveDirtyToTaskBranch%"
       },
       {
         "command": "branchpilot.verifyBranchForTask",
-        "title": "BranchPilot: Verificar rama antes de delegar al agente"
+        "title": "%branchpilot.command.verifyBranchForTask%"
       },
       {
         "command": "branchpilot.setupAgentRules",
-        "title": "BranchPilot: Configurar reglas para agentes de IA (AGENTS.md)…"
+        "title": "%branchpilot.command.setupAgentRules%"
       },
       {
         "command": "branchpilot.createWorktree",
-        "title": "BranchPilot: Crear worktree paralelo…"
+        "title": "%branchpilot.command.createWorktree%"
       },
       {
         "command": "branchpilot.openWorktree",
-        "title": "BranchPilot: Abrir worktree en nueva ventana…"
+        "title": "%branchpilot.command.openWorktree%"
       },
       {
         "command": "branchpilot.removeWorktree",
-        "title": "BranchPilot: Quitar worktree secundario…"
+        "title": "%branchpilot.command.removeWorktree%"
       },
       {
         "command": "branchpilot.diagnoseEnvironment",
-        "title": "BranchPilot: Diagnosticar compatibilidad del IDE y Git"
+        "title": "%branchpilot.command.diagnoseEnvironment%"
       },
       {
         "command": "branchpilot.switchRepository",
-        "title": "BranchPilot: Cambiar de repositorio en el workspace…"
+        "title": "%branchpilot.command.switchRepository%"
       },
       {
         "command": "branchpilot.openRepositoryInWindow",
-        "title": "BranchPilot: Abrir repositorio en nueva ventana…"
+        "title": "%branchpilot.command.openRepositoryInWindow%"
       }
     ],
     "configuration": {
@@ -128,12 +132,12 @@
             "off"
           ],
           "enumDescriptions": [
-            "Pide confirmación antes de operar en cualquier rama.",
-            "Pide confirmación solo en las ramas de la lista protectedBranches.",
-            "No pide confirmación."
+            "%branchpilot.config.protection.mode.all%",
+            "%branchpilot.config.protection.mode.list%",
+            "%branchpilot.config.protection.mode.off%"
           ],
           "default": "all",
-          "description": "Cuándo pedir confirmación antes de operaciones que modifican código o pueden perder trabajo."
+          "description": "%branchpilot.config.protection.mode%"
         },
         "branchpilot.protection.protectedBranches": {
           "type": "array",
@@ -145,13 +149,13 @@
             "master",
             "develop"
           ],
-          "description": "Ramas resaltadas como protegidas (patrones con * permitidos, p. ej. release/*)."
+          "description": "%branchpilot.config.protection.protectedBranches%"
         },
         "branchpilot.staleDays": {
           "type": "number",
           "default": 90,
           "minimum": 1,
-          "description": "Días sin actividad tras los cuales una rama se considera antigua."
+          "description": "%branchpilot.config.staleDays%"
         },
         "branchpilot.scanPaths": {
           "type": "array",
@@ -159,7 +163,7 @@
             "type": "string"
           },
           "default": [],
-          "description": "Rutas absolutas de carpetas adicionales donde buscar repositorios Git para el dashboard multi-repositorio."
+          "description": "%branchpilot.config.scanPaths%"
         },
         "branchpilot.worktree.copyIgnoredFiles": {
           "type": "array",
@@ -173,17 +177,17 @@
             ".env.development.local",
             ".env.test"
           ],
-          "description": "Archivos de entorno ignorados por Git que se copian automáticamente al crear un nuevo worktree paralelo."
+          "description": "%branchpilot.config.worktree.copyIgnoredFiles%"
         },
         "branchpilot.worktree.linkNodeModules": {
           "type": "boolean",
           "default": true,
-          "description": "Crear enlace simbólico de node_modules en el nuevo worktree paralelo si existe en el repositorio principal."
+          "description": "%branchpilot.config.worktree.linkNodeModules%"
         },
         "branchpilot.autoGuard.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Mostrar alerta reactiva cuando se detecten ediciones sobre una rama protegida (main/master) ofreciendo mover los cambios a una nueva rama de tarea."
+          "description": "%branchpilot.config.autoGuard.enabled%"
         }
       }
     }

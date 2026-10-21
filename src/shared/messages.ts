@@ -1,15 +1,17 @@
+import type { Locale } from './i18n';
 import type { ProtectionConfig } from './protection';
 import type { CommitSummary, RepoOverview, RepoState } from './types';
 
 /** Estado completo que la extensión envía al panel. */
 export type PanelState =
-  | { kind: 'empty' }
+  | { kind: 'empty'; locale?: Locale }
   | {
       kind: 'repo';
       repo: RepoState;
       repositories: RepoOverview[];
       protection: ProtectionConfig;
       staleDays: number;
+      locale?: Locale;
     };
 
 export type ToWebview =
@@ -24,6 +26,7 @@ export type FromWebview =
   | { type: 'createBranch'; base?: string }
   | { type: 'renameBranch'; ref: string }
   | { type: 'deleteBranch'; ref: string }
+  | { type: 'undoLastAction' }
   | { type: 'createTaskBranch' }
   | { type: 'moveDirtyToTaskBranch' }
   | { type: 'verifyBranchForTask' }
@@ -40,6 +43,7 @@ export function isFromWebview(value: unknown): value is FromWebview {
   switch (message.type) {
     case 'ready':
     case 'refresh':
+    case 'undoLastAction':
     case 'createTaskBranch':
     case 'moveDirtyToTaskBranch':
     case 'verifyBranchForTask':

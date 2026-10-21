@@ -3,7 +3,8 @@ import path from 'node:path';
 import * as vscode from 'vscode';
 import { evaluateAgentPrecheck, suggestTaskBranchName, upsertAgentRuleInContent } from './ai/taskContext';
 import { GitError } from './git/runner';
-import { bootstrapWorktree } from './git/worktreeBootstrap';
+import { UndoStack, describeUndoEntry } from './git/undoStack';
+import { bootstrapWorktree, runPackageInstall } from './git/worktreeBootstrap';
 import { evaluateGuard, validateBranchName } from './guards/branchGuards';
 import type { ConfirmPrompt, DirtyPrompt, DirtyResolution, GuardAction, GuardContext } from './guards/branchGuards';
 import type { RepoService } from './repoService';
@@ -15,6 +16,7 @@ export const CHECKOUT_COMMAND = 'branchpilot.checkout';
 export const CREATE_BRANCH_COMMAND = 'branchpilot.createBranch';
 export const RENAME_BRANCH_COMMAND = 'branchpilot.renameBranch';
 export const DELETE_BRANCH_COMMAND = 'branchpilot.deleteBranch';
+export const UNDO_LAST_ACTION_COMMAND = 'branchpilot.undoLastBranchAction';
 export const CREATE_TASK_BRANCH_COMMAND = 'branchpilot.createTaskBranch';
 export const MOVE_DIRTY_TO_TASK_COMMAND = 'branchpilot.moveDirtyToTaskBranch';
 export const VERIFY_TASK_BRANCH_COMMAND = 'branchpilot.verifyBranchForTask';
@@ -38,6 +40,8 @@ function formatGitFailure(error: unknown): string {
  * aplicando siempre los guards de seguridad antes de modificar el repositorio.
  */
 export class BranchActions {
+  private readonly undoStack = new UndoStack();
+
   constructor(private readonly repos: RepoService) {}
 
   private requireState(): RepoState | undefined {
@@ -121,8 +125,18 @@ export class BranchActions {
 
     if (!(await this.verifyAndPrepare({ kind: 'checkout', target: displayTarget }, state))) return;
 
+    const previousRef = state.head.detached ? (state.head.shortHash ?? '') : (state.head.branch ?? '');
     try {
       const switched = await this.repos.checkout(branch?.fullRef ?? targetRef);
+      if (previousRef && previousRef !== switched) {
+        this.undoStack.push({
+          kind: 'checkout',
+          repoRoot: state.root,
+          previousRef,
+          targetRef: switched,
+          timestamp: Date.now(),
+        });
+      }
       void vscode.window.setStatusBarMessage(`BranchPilot: En rama «${switched}»`, 4000);
     } catch (error) {
       void vscode.window.showErrorMessage(`No se pudo cambiar a «${displayTarget}»: ${formatGitFailure(error)}`);
@@ -218,13 +232,20 @@ export class BranchActions {
 
     try {
       await this.repos.renameBranch(branch.name, newName);
+      this.undoStack.push({
+        kind: 'renameBranch',
+        repoRoot: freshState.root,
+        fromName: branch.name,
+        toName: newName,
+        timestamp: Date.now(),
+      });
       void vscode.window.setStatusBarMessage(`BranchPilot: Rama renombrada a «${newName}»`, 4000);
     } catch (error) {
       void vscode.window.showErrorMessage(`No se pudo renombrar «${branch.name}»: ${formatGitFailure(error)}`);
     }
   }
 
-  /** Elimina una rama local previa confirmación. */
+  /** Elimina una rama local previa confirmación y ofrece deshacer la eliminación al instante. */
   async deleteBranch(fullRef?: string): Promise<void> {
     await this.repos.refresh();
     const state = this.requireState();
@@ -242,11 +263,87 @@ export class BranchActions {
     if (!(await this.verifyAndPrepare({ kind: 'deleteBranch', branch }, state))) return;
 
     try {
-      await this.repos.deleteBranch(branch.name, !branch.merged);
-      void vscode.window.setStatusBarMessage(`BranchPilot: Rama «${branch.name}» eliminada`, 4000);
+      const deletedSha = await this.repos.deleteBranch(branch.name, !branch.merged);
+      this.undoStack.push({
+        kind: 'deleteBranch',
+        repoRoot: state.root,
+        branchName: branch.name,
+        targetSha: deletedSha,
+        timestamp: Date.now(),
+      });
+      const undoOpt = 'Deshacer';
+      const choice = await vscode.window.showInformationMessage(
+        `BranchPilot: Rama «${branch.name}» eliminada (${deletedSha.slice(0, 7)}).`,
+        undoOpt,
+      );
+      if (choice === undoOpt) {
+        await this.undoLastBranchAction();
+      }
     } catch (error) {
       void vscode.window.showErrorMessage(`No se pudo eliminar «${branch.name}»: ${formatGitFailure(error)}`);
     }
+  }
+
+  /**
+   * Deshace la última operación de rama registrada en memoria (`deleteBranch`, `renameBranch`, `checkout`)
+   * o permite restaurar desde las últimas entradas de `git reflog` si la pila en memoria está vacía.
+   */
+  async undoLastBranchAction(): Promise<void> {
+    await this.repos.refresh();
+    const state = this.requireState();
+    if (!state) return;
+
+    const top = this.undoStack.pop(state.root);
+    if (top) {
+      try {
+        switch (top.kind) {
+          case 'deleteBranch':
+            await this.repos.restoreBranch(top.branchName, top.targetSha);
+            void vscode.window.showInformationMessage(
+              `BranchPilot: Rama «${top.branchName}» restaurada en ${top.targetSha.slice(0, 7)}.`,
+            );
+            return;
+          case 'renameBranch':
+            await this.repos.renameBranch(top.toName, top.fromName);
+            void vscode.window.showInformationMessage(
+              `BranchPilot: Renombrado revertido a «${top.fromName}».`,
+            );
+            return;
+          case 'checkout':
+            await this.repos.checkout(top.previousRef);
+            void vscode.window.showInformationMessage(
+              `BranchPilot: De vuelta en «${top.previousRef}».`,
+            );
+            return;
+        }
+      } catch (error) {
+        void vscode.window.showErrorMessage(
+          `No se pudo deshacer (${describeUndoEntry(top)}): ${formatGitFailure(error)}`,
+        );
+        return;
+      }
+    }
+
+    const reflog = await this.repos.recentReflog(10);
+    if (reflog.length === 0) {
+      void vscode.window.showInformationMessage('BranchPilot: No hay acciones recientes ni entradas de reflog para deshacer.');
+      return;
+    }
+
+    const picked = await vscode.window.showQuickPick(
+      reflog.map((entry) => ({
+        label: `${entry.selector} · ${entry.sha.slice(0, 7)}`,
+        description: entry.subject,
+        entry,
+      })),
+      {
+        title: 'Recuperar estado desde git reflog',
+        placeHolder: 'Selecciona un punto del reflog para crear una rama de recuperación desde ese commit',
+      },
+    );
+    if (!picked) return;
+
+    await this.createBranch(picked.entry.sha);
   }
 
   private async pickBranch(branches: BranchInfo[], placeHolder: string): Promise<BranchInfo | undefined> {
@@ -596,14 +693,30 @@ export class BranchActions {
       const extras: string[] = [];
       if (boot.copiedFiles.length > 0) extras.push(`copiados: ${boot.copiedFiles.join(', ')}`);
       if (boot.linkedNodeModules) extras.push('node_modules enlazado');
+      if (boot.skippedSymlinkForMonorepo) extras.push('monorepo pnpm detectado');
       const extraText = extras.length > 0 ? ` (${extras.join(' · ')})` : '';
 
       const openOpt = 'Abrir en nueva ventana';
+      const installCmd = boot.skippedSymlinkForMonorepo ? boot.packageManager.installCommand : undefined;
+      const installAndOpenOpt = installCmd ? `Instalar (${installCmd.display}) y abrir` : undefined;
+      const buttons = installAndOpenOpt ? [installAndOpenOpt, openOpt] : [openOpt];
+
       const choice = await vscode.window.showInformationMessage(
         `BranchPilot: Worktree creado en «${createdPath}»${extraText}.`,
-        openOpt,
+        ...buttons,
       );
-      if (choice === openOpt) {
+      if (choice === installAndOpenOpt && installCmd) {
+        await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: `BranchPilot: Ejecutando ${installCmd.display} en worktree…`,
+          },
+          async () => {
+            await runPackageInstall(createdPath, installCmd);
+          },
+        );
+        await this.openWorktree(createdPath);
+      } else if (choice === openOpt) {
         await this.openWorktree(createdPath);
       }
     } catch (error) {
