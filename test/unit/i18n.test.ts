@@ -28,5 +28,9 @@ describe('i18n (es / en)', () => {
     expect(en.badgeCurrent).toBe('current');
     expect(es.quickCommitBtn).toBe('Commit');
     expect(en.quickCommitBtn).toBe('Commit');
+    expect(es.quickCommitProtectedBtn('main')).toBe('Commit en main');
+    expect(en.quickCommitProtectedBtn('main')).toBe('Commit to main');
+    expect(es.noBranchesInRepo).toBe('Este repositorio aún no tiene ramas.');
+    expect(en.noBranchesInRepo).toBe('This repository has no branches yet.');
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computeWindow, scrollTopToReveal } from '../../src/shared/virtual';
-import { relativeTime } from '../../src/shared/time';
+import { relativeTime, shortRelativeTime } from '../../src/shared/time';
 import { isListedProtected, requiresConfirmation } from '../../src/shared/protection';
 
 describe('computeWindow', () => {
@@ -36,7 +36,7 @@ describe('scrollTopToReveal', () => {
 
 describe('relativeTime', () => {
   const now = 1_000_000_000_000;
-  const ago = (s: number): string => relativeTime(now / 1000 - s, now);
+  const ago = (s: number, locale: 'es' | 'en' = 'es'): string => relativeTime(now / 1000 - s, now, locale);
   it('formatea en español con singular y plural', () => {
     expect(ago(1)).toBe('hace un momento');
     expect(ago(90)).toBe('hace 1 minuto');
@@ -45,8 +45,25 @@ describe('relativeTime', () => {
     expect(ago(40 * 86_400)).toBe('hace 1 mes');
     expect(ago(800 * 86_400)).toBe('hace 2 años');
   });
+  it('formatea en inglés con singular y plural sin Spanglish', () => {
+    expect(ago(1, 'en')).toBe('just now');
+    expect(ago(90, 'en')).toBe('1 minute ago');
+    expect(ago(2 * 3600, 'en')).toBe('2 hours ago');
+    expect(ago(86_400, 'en')).toBe('1 day ago');
+    expect(ago(10 * 86_400, 'en')).toBe('10 days ago');
+    expect(ago(40 * 86_400, 'en')).toBe('1 month ago');
+    expect(ago(800 * 86_400, 'en')).toBe('2 years ago');
+  });
+  it('formatea tiempos cortos en es y en', () => {
+    expect(shortRelativeTime(now / 1000 - 1, now, 'es')).toBe('un momento');
+    expect(shortRelativeTime(now / 1000 - 1, now, 'en')).toBe('just now');
+    expect(shortRelativeTime(now / 1000 - 120, now, 'es')).toBe('2 minutos');
+    expect(shortRelativeTime(now / 1000 - 120, now, 'en')).toBe('2 minutes');
+    expect(shortRelativeTime(now / 1000 - 10 * 86_400, now, 'en')).toBe('10 days');
+  });
   it('no devuelve tiempos negativos con fechas futuras', () => {
     expect(relativeTime(now / 1000 + 500, now)).toBe('hace un momento');
+    expect(relativeTime(now / 1000 + 500, now, 'en')).toBe('just now');
   });
 });
 

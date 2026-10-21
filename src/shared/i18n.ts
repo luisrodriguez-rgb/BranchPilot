@@ -56,8 +56,13 @@ export interface UiStrings {
   deleteBranchTooltip: (branch: string) => string;
   // Quick commit & SCM
   quickCommitBtn: string;
+  quickCommitProtectedBtn: (branch: string) => string;
+  quickCommitProtectedTooltip: (branch: string) => string;
   quickCommitPlaceholder: string;
   openScmTooltip: string;
+  // Empty / Filter results
+  noBranchesInRepo: string;
+  noMatchingBranches: string;
   // Footer
   footerRemotesUpdated: (time: string) => string;
   footerNoFetch: string;
@@ -118,8 +123,12 @@ const ES_STRINGS: UiStrings = {
   renameBranchTooltip: (b) => `Renombrar ${b}`,
   deleteBranchTooltip: (b) => `Eliminar ${b}`,
   quickCommitBtn: 'Commit',
+  quickCommitProtectedBtn: (b) => `Commit en ${b}`,
+  quickCommitProtectedTooltip: (b) => `Rama protegida (${b}): pedirá confirmación antes de hacer commit directo`,
   quickCommitPlaceholder: 'Mensaje de commit…',
   openScmTooltip: 'Abrir en Source Control para revisar cambios o autogenerar mensaje con Copilot',
+  noBranchesInRepo: 'Este repositorio aún no tiene ramas.',
+  noMatchingBranches: 'Ninguna rama coincide con el filtro.',
   footerRemotesUpdated: (time) => `Remotas actualizadas ${time} (último fetch).`,
   footerNoFetch: 'Sin fetch registrado: las ramas remotas pueden estar desactualizadas.',
   footerNoBase: 'No se detectó rama base; no se muestran ahead/behind.',
@@ -179,8 +188,12 @@ const EN_STRINGS: UiStrings = {
   renameBranchTooltip: (b) => `Rename ${b}`,
   deleteBranchTooltip: (b) => `Delete ${b}`,
   quickCommitBtn: 'Commit',
+  quickCommitProtectedBtn: (b) => `Commit to ${b}`,
+  quickCommitProtectedTooltip: (b) => `Protected branch (${b}): will ask for confirmation before committing`,
   quickCommitPlaceholder: 'Commit message…',
   openScmTooltip: 'Open in Source Control to inspect diffs or generate message with Copilot',
+  noBranchesInRepo: 'This repository has no branches yet.',
+  noMatchingBranches: 'No branches match the current filter.',
   footerRemotesUpdated: (time) => `Remotes updated ${time} (last fetch).`,
   footerNoFetch: 'No fetch recorded: remote branches may be outdated.',
   footerNoBase: 'No base branch detected; ahead/behind not shown.',
